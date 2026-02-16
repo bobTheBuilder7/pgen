@@ -1,0 +1,3 @@
+db/*.go
+!db/db.go
+.DS_Store
