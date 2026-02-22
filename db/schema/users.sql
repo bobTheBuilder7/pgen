@@ -1,4 +1,4 @@
-CREATE TABLE employees (
+CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE
 );

@@ -1,7 +1,4 @@
--- name: GetUser :one
-SELECT name FROM users
-WHERE id = $1;
-
--- name: GetAuthors :many
-SELECT name FROM users
-WHERE id = $1;
+-- name: GetUserByID :users :one
+SELECT name
+FROM users
+WHERE users.id = $1;
