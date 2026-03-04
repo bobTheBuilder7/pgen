@@ -21,7 +21,7 @@ func parseSchema(ctx context.Context, reader io.Reader) error {
 		return err
 	}
 
-	parsedSQL, err := postgresparser.ParseSQL(sql)
+	parsedSQL, err := postgresparser.ParseSQLStrict(sql)
 	if err != nil {
 		return err
 	}

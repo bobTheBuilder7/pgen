@@ -1,7 +1,9 @@
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
-github.com/dave/jennifer v1.7.1 h1:B4jJJDHelWcDhlRQxWeo0Npa/pYKBLrirAQoTN45txo=
-github.com/dave/jennifer v1.7.1/go.mod h1:nXbxhEmQfOZhWml3D1cDK5M1FLnMSozpbFN/m3RmGZc=
+github.com/bobTheBuilder7/gen v0.0.1 h1:jVO7CSDsK25CXYxzET6k0Ed+y5c9CeXYB44RmTmt1L0=
+github.com/bobTheBuilder7/gen v0.0.1/go.mod h1:mFOJLXJ2YLhDQ7oh+A3Lh8N4XH0rMU6HBZizz5w7eyg=
+github.com/bobTheBuilder7/postgresparser v0.0.0-20260228041432-6738614c24f6 h1:35vRbseDPXfL556SXzPdN1YSO1R82951+7Xgn+/U3PE=
+github.com/bobTheBuilder7/postgresparser v0.0.0-20260228041432-6738614c24f6/go.mod h1:zoBRS8LfhyXMMmaubO7OSPlCZo/xANUvO/wEDvqobmc=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -20,8 +22,10 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/valkdb/postgresparser v1.0.5 h1:3DW2VPPpFRVAyE7I/a7zuo6sxa7w6ReFYbGWelrt5R8=
-github.com/valkdb/postgresparser v1.0.5/go.mod h1:ZLdOJbyhChgvx3QpbYKR8VPpUMVG3pHNv+2pS8T2uXQ=
+github.com/valkdb/postgresparser v1.1.4 h1:FFTdELOfMKs2xS/B8+g0iaz+F3UAygB3r1bL2+kSeDM=
+github.com/valkdb/postgresparser v1.1.4/go.mod h1:ZLdOJbyhChgvx3QpbYKR8VPpUMVG3pHNv+2pS8T2uXQ=
+github.com/valkdb/postgresparser v1.1.5 h1:9thPhmbqVKxuDKyPUti1+iLKutZKZRgJbOtHg86OoZU=
+github.com/valkdb/postgresparser v1.1.5/go.mod h1:ZLdOJbyhChgvx3QpbYKR8VPpUMVG3pHNv+2pS8T2uXQ=
 golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 h1:vr/HnozRka3pE4EsMEg1lgkXJkTFJCVUX+S/ZT6wYzM=
 golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842/go.mod h1:XtvwrStGgqGPLc4cjQfWqZHG1YFdYs6swckp8vpsjnc=
 golang.org/x/sync v0.19.0 h1:vV+1eWNmZ5geRlYjzm2adRgW2/mcpevXNg50YZtPCE4=

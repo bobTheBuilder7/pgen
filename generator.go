@@ -5,28 +5,41 @@ import (
 	"fmt"
 	"io"
 
-	. "github.com/dave/jennifer/jen"
-	"github.com/valkdb/postgresparser"
+	"github.com/bobTheBuilder7/gen"
+	"github.com/bobTheBuilder7/postgresparser"
 )
 
-func generateCode(queries []Query, output io.Writer) error {
-	generatedFile := NewFile("db")
+func generateCode(queries []Query, output io.Writer) (int64, error) {
+	generatedFile := gen.NewFile("db")
 
 	for _, query := range queries {
-		parsedSQL, err := postgresparser.ParseSQL(query.sql)
+		parsedSQL, err := postgresparser.ParseSQLStrict(query.sql)
 		if err != nil {
-			return err
+			return 0, err
 		}
 
-		for _, table := range parsedSQL.Tables {
-			_, ok := tablesCol.Load(table.Name)
-			if !ok {
-				return fmt.Errorf("query: %s access invalid table %s", query.name, table.Name)
-			}
+		if len(parsedSQL.Tables) != 1 {
+			panic("complex query")
 		}
+
+		fmt.Println(parsedSQL.Tables[0].Type)
+
+		// for _, table := range parsedSQL.Tables {
+		// 	_, ok := tablesCol.Load(table.Name)
+		// 	if !ok {
+		// 		return fmt.Errorf("query: %s access invalid table %s", query.name, table.Name)
+		// 	}
+		// }
 
 		switch command := parsedSQL.Command; command {
 		case postgresparser.QueryCommandSelect:
+
+			// for _, table := range parsedSQL.Tables {
+			// 	fmt.Println(table.JoinType)
+			// }
+
+			// fmt.Println(parsedSQL.ColumnUsage[0])
+
 			// projections := filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeProjection)
 			// joins := filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeJoin)
 			// projection := projections[0]
@@ -41,29 +54,26 @@ func generateCode(queries []Query, output io.Writer) error {
 			// 	fmt.Println(i)
 			// }
 
-			// generatedFile.Const().Id(query.name + "SQL").Op("=").Lit(query.sql)
-			// generatedFile.Line()
-			// queryFunc := generatedFile.Func().Params(Id("q").Id("*Queries")).Id(query.name).Params(Id("ctx").Qual("context", "Context"), Id("id").Int64())
-			// generatedFile.Line()
+			generatedFile.AddBlock(
+				gen.Const(query.name+"SQL", gen.String(query.sql)),
+			)
 
-			// queryFunc.Block(
-			// 	Id("q").
-			// 		Dot("db").
-			// 		Dot("QueryRow").
-			// 		Call(
-			// 			Id("ctx"),
-			// 			Id(query.name+"SQL"),
-			// 			Id("id"),
-			// 		),
-			// )
+			generatedFile.AddBlock(
+				gen.MethodFunc("q *Queries", query.name, "ctx context.Context, id int64", "(string, error)",
+					gen.Call("rows, err", "q.db.Query", gen.Arg("ctx"), gen.Arg(query.name+"SQL")),
+					gen.ErrCheck("\"empty\""),
+					gen.Line("return \"asdds\", nil"),
+				),
+			)
+
 		case postgresparser.QueryCommandInsert:
 		case postgresparser.QueryCommandUpdate:
 		case postgresparser.QueryCommandDelete:
 		default:
-			return errors.New("not implemented")
+			return 0, errors.New("not implemented")
 		}
 	}
-	return generatedFile.Render(output)
+	return generatedFile.WriteTo(output)
 
 }
 

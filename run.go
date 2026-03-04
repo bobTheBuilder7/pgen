@@ -70,7 +70,7 @@ func run(ctx context.Context) error {
 			}
 			defer output.Close()
 
-			err = generateCode(queries, output)
+			_, err = generateCode(queries, output)
 			if err != nil {
 				return err
 			}

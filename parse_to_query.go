@@ -9,6 +9,12 @@ import (
 	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
 )
 
+type Query struct {
+	name string
+	t    string
+	sql  string
+}
+
 func parseFileToQueries(ctx context.Context, reader io.Reader) ([]Query, error) {
 	b := bytesbufferpool.Get()
 	defer bytesbufferpool.Put(b)
@@ -34,13 +40,12 @@ func parseFileToQueries(ctx context.Context, reader io.Reader) ([]Query, error) 
 		if strings.HasPrefix(line, "-- name:") {
 			line = strings.ReplaceAll(line, " ", "")
 			parts := strings.Split(line, ":")
-			if len(parts) != 4 {
+			if len(parts) != 3 {
 				return queries, errors.New("invalid header")
 			}
 
 			query.name = parts[1]
-			query.table = parts[2]
-			query.t = parts[3]
+			query.t = parts[2]
 		}
 
 		sql, err := b.ReadString(';')
