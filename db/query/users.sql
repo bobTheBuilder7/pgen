@@ -1,4 +1,8 @@
 -- name: GetUserByID :one
-SELECT u.id as user_id, u.name as user_name, 'asdsda' as suren
-FROM users u
-WHERE u.id = $1;
+SELECT users.id, users.name
+FROM users
+WHERE users.id = $1 and users.name = $2;
+
+-- name: DeleteUserByID :exec
+DELETE FROM users
+WHERE users.id = $1;

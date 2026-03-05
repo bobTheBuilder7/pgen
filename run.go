@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
 	"golang.org/x/sync/errgroup"
 )
 
 func run(ctx context.Context) error {
+	c := &cli{}
 	eg, ctx := errgroup.WithContext(ctx)
 
 	files, err := os.ReadDir(filepath.Join(dbDirectory, schemaDirectory))
@@ -31,7 +33,7 @@ func run(ctx context.Context) error {
 			}
 			defer f.Close()
 
-			return parseSchema(ctx, f)
+			return c.parseSchema(ctx, f)
 		})
 	}
 
@@ -64,13 +66,18 @@ func run(ctx context.Context) error {
 				return err
 			}
 
-			output, err := os.Create(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)))
+			buf := bytesbufferpool.Get()
+			err = c.generateCode(queries, buf)
 			if err != nil {
 				return err
 			}
-			defer output.Close()
 
-			_, err = generateCode(queries, output)
+			// formatted, err := format.Source(buf.Bytes())
+			// if err != nil {
+			// 	return fmt.Errorf("formatting %s: %w", filename, err)
+			// }
+
+			err = os.WriteFile(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)), buf.Bytes(), 0644)
 			if err != nil {
 				return err
 			}

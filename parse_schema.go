@@ -10,7 +10,7 @@ import (
 	"github.com/valkdb/postgresparser"
 )
 
-func parseSchema(ctx context.Context, reader io.Reader) error {
+func (c *cli) parseSchema(ctx context.Context, reader io.Reader) error {
 	b := bytesbufferpool.Get()
 	defer bytesbufferpool.Put(b)
 
@@ -38,12 +38,12 @@ func parseSchema(ctx context.Context, reader io.Reader) error {
 		return errors.New("DDLActions is not one")
 	}
 
-	_, ok := tablesCol.Load(parsedSQL.Tables[0].Name)
+	_, ok := c.tablesCol.Load(parsedSQL.Tables[0].Name)
 	if ok {
 		return fmt.Errorf("table %s defined twice", parsedSQL.Tables[0].Name)
 	}
 
-	tablesCol.Store(parsedSQL.Tables[0].Name, parsedSQL.DDLActions[0].ColumnDetails)
+	c.tablesCol.Store(parsedSQL.Tables[0].Name, parsedSQL.DDLActions[0].ColumnDetails)
 
 	return nil
 }

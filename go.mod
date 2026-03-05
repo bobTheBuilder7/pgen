@@ -3,8 +3,7 @@ module github.com/bobTheBuilder7/pgen
 go 1.26.0
 
 require (
-	github.com/bobTheBuilder7/gen v0.0.1
-	github.com/bobTheBuilder7/postgresparser v0.0.0-20260228041432-6738614c24f6
+	github.com/bobTheBuilder7/gen v0.0.2
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/valkdb/postgresparser v1.1.5
 	golang.org/x/sync v0.19.0
