@@ -1,11 +1,8 @@
 package db
 
-import (
-	"context"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-)
+import "context"
+import "github.com/jackc/pgx/v5"
+import "github.com/jackc/pgx/v5/pgconn"
 
 type DBTX interface {
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)

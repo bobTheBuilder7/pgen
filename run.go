@@ -91,5 +91,16 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	baseFile, err := os.Create("./db/db.go")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer baseFile.Close()
+
+	err = generateBaseFile(baseFile)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	return nil
 }

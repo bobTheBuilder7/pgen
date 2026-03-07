@@ -127,7 +127,7 @@ func TestResolveParams_MultipleParams(t *testing.T) {
 	names, types, err := c.resolveParams(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, names, []string{"org_id", "active"})
-	assert.Equal(t, types, []string{"int64", "bool"})
+	assert.Equal(t, types, []string{"int64", "pgtype.Bool"})
 }
 
 func TestResolveParams_AliasedTable(t *testing.T) {
@@ -141,7 +141,7 @@ func TestResolveParams_AliasedTable(t *testing.T) {
 	names, types, err := c.resolveParams(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, names, []string{"referrer_id"})
-	assert.Equal(t, types, []string{"int64"})
+	assert.Equal(t, types, []string{"pgtype.Int8"})
 }
 
 func TestResolveParams_ThreeParamsMixedTypes(t *testing.T) {
@@ -155,7 +155,7 @@ func TestResolveParams_ThreeParamsMixedTypes(t *testing.T) {
 	names, types, err := c.resolveParams(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, names, []string{"role_id", "name", "active"})
-	assert.Equal(t, types, []string{"int32", "string", "bool"})
+	assert.Equal(t, types, []string{"int32", "string", "pgtype.Bool"})
 }
 
 func TestResolveParams_FourParamsAllIntSizes(t *testing.T) {
@@ -198,4 +198,158 @@ func TestResolveParams_DeleteMultipleParams(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, names, []string{"id", "name"})
 	assert.Equal(t, types, []string{"int64", "string"})
+}
+
+func TestResolveParams_UpdateSetAndWhere(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1 WHERE users.id = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "id"})
+	assert.Equal(t, types, []string{"string", "int64"})
+}
+
+func TestResolveParams_UpdateMultipleSetColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1, email = $2, active = $3 WHERE users.id = $4;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "email", "active", "id"})
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Bool", "int64"})
+}
+
+func TestResolveParams_UpdateMultipleWhereColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET verified = $1 WHERE users.id = $2 AND users.org_id = $3;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"verified", "id", "org_id"})
+	assert.Equal(t, types, []string{"bool", "int64", "int64"})
+}
+
+func TestResolveParams_InsertSimple(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, status) VALUES ($1, $2, $3);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "email", "status"})
+	assert.Equal(t, types, []string{"string", "string", "int16"})
+}
+
+func TestResolveParams_InsertWithNullableColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, age, active) VALUES ($1, $2, $3, $4);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "email", "age", "active"})
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Int2", "pgtype.Bool"})
+}
+
+func TestResolveParams_InsertAllIntSizes(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "email", "status", "role_id", "org_id"})
+	assert.Equal(t, types, []string{"string", "string", "int16", "int32", "int64"})
+}
+
+func TestResolveParams_InsertSingleColumn(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name) VALUES ($1);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name"})
+	assert.Equal(t, types, []string{"string"})
+}
+
+func TestResolveParams_InsertBooleans(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, active, verified) VALUES ($1, $2, $3, $4);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "email", "active", "verified"})
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Bool", "bool"})
+}
+
+func TestResolveParams_InsertNullableIntSizes(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, age, login_count, referrer_id) VALUES ($1, $2, $3, $4, $5);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "email", "age", "login_count", "referrer_id"})
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Int2", "pgtype.Int4", "pgtype.Int8"})
+}
+
+func TestResolveParams_InsertAllColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (id, name, email, age, status, role_id, login_count, org_id, referrer_id, active, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"id", "name", "email", "age", "status", "role_id", "login_count", "org_id", "referrer_id", "active", "verified"})
+	assert.Equal(t, types, []string{"int64", "string", "string", "pgtype.Int2", "int16", "int32", "pgtype.Int4", "int64", "pgtype.Int8", "pgtype.Bool", "bool"})
+}
+
+func TestResolveParams_InsertMixedNullability(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, age, status, login_count, role_id) VALUES ($1, $2, $3, $4, $5);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "age", "status", "login_count", "role_id"})
+	assert.Equal(t, types, []string{"string", "pgtype.Int2", "int16", "pgtype.Int4", "int32"})
 }

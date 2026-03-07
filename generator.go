@@ -7,86 +7,61 @@ import (
 	"strings"
 
 	"github.com/bobTheBuilder7/gen"
-	"github.com/bobTheBuilder7/pgen/utils"
 	"github.com/valkdb/postgresparser"
 )
 
-func pgTypeToGoType(pgType string) string {
+func pgTypeToGoType(pgType string, nullable bool) string {
 	switch strings.ToLower(pgType) {
 	case "bigserial", "bigint", "int8":
+		if nullable {
+			return "pgtype.Int8"
+		}
 		return "int64"
 	case "serial", "integer", "int", "int4":
+		if nullable {
+			return "pgtype.Int4"
+		}
 		return "int32"
 	case "smallserial", "smallint", "int2":
+		if nullable {
+			return "pgtype.Int2"
+		}
 		return "int16"
 	case "boolean", "bool":
+		if nullable {
+			return "pgtype.Bool"
+		}
 		return "bool"
 	case "real", "float4":
+		if nullable {
+			return "pgtype.Float4"
+		}
 		return "float32"
 	case "double precision", "float8":
+		if nullable {
+			return "pgtype.Float8"
+		}
 		return "float64"
-	case "text", "varchar", "character varying", "char", "character", "uuid":
+	case "text", "varchar", "character varying", "char", "character":
+		if nullable {
+			return "pgtype.Text"
+		}
+		return "string"
+	case "uuid":
+		if nullable {
+			return "pgtype.UUID"
+		}
 		return "string"
 	default:
 		return "string"
 	}
 }
 
-// resolveColumnGoType resolves the Go type for a SELECT projection column.
-// It handles table-qualified columns (e.g. u.id) and string literals (e.g. 'foo').
-func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []postgresparser.TableRef) (string, error) {
-	expr := strings.TrimSpace(col.Expression)
-
-	// String literal
-	if strings.HasPrefix(expr, "'") {
-		return "string", nil
-	}
-
-	// Parse table_alias.column_name or just column_name
-	var tableAlias, colName string
-	if parts := strings.SplitN(expr, ".", 2); len(parts) == 2 {
-		tableAlias = parts[0]
-		colName = parts[1]
-	} else {
-		colName = parts[0]
-	}
-
-	// Find the real table name from the alias
-	var tableName string
-	if tableAlias != "" {
-		for _, t := range tables {
-			if t.Alias == tableAlias || t.Name == tableAlias {
-				tableName = t.Name
-				break
-			}
-		}
-	} else if len(tables) == 1 {
-		tableName = tables[0].Name
-	}
-
-	if tableName == "" {
-		return "string", nil
-	}
-
-	// Look up schema columns
-	ddlColumns, ok := c.tablesCol.Load(tableName)
-	if !ok {
-		return "", fmt.Errorf("table %s not found in schema", tableName)
-	}
-
-	for _, ddlCol := range ddlColumns {
-		if ddlCol.Name == colName {
-			return pgTypeToGoType(ddlCol.Type), nil
-		}
-	}
-
-	return "string", nil
-}
-
 func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	generatedFile := gen.NewFile("db")
 
 	generatedFile.AddBlock(gen.Import("", "context"))
+	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 
 	for _, query := range queries {
 		parsedSQL, err := postgresparser.ParseSQLStrict(query.sql)
@@ -100,32 +75,9 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 
 		switch command := parsedSQL.Command; command {
 		case postgresparser.QueryCommandSelect:
-			if query.t != "one" {
-				return fmt.Errorf("query type %s not yet supported", query.t)
-			}
-
-			// Resolve projected column types for the result struct
-			var structFields []gen.Field
-			var scanFields []string
-			for _, col := range parsedSQL.Columns {
-				goType, err := c.resolveColumnGoType(col, parsedSQL.Tables)
-				if err != nil {
-					return err
-				}
-
-				// Use alias if available, otherwise extract the column name from the expression
-				fieldName := col.Alias
-				if fieldName == "" {
-					fieldName = col.Expression
-					// Strip table qualifier (e.g. "users.id" -> "id")
-					if dotIdx := strings.LastIndex(fieldName, "."); dotIdx != -1 {
-						fieldName = fieldName[dotIdx+1:]
-					}
-				}
-				fieldName = utils.ToPascalCase(fieldName)
-
-				structFields = append(structFields, gen.Field{Name: fieldName, Type: goType})
-				scanFields = append(scanFields, "&i."+fieldName)
+			structFields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+			if err != nil {
+				return err
 			}
 
 			rowStructName := query.name + "Row"
@@ -151,18 +103,94 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			// Generate SQL const
 			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
 
-			// Generate method
-			generatedFile.AddBlock(
-				gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
-					gen.Call("row", "q.db.QueryRow", callArgs...),
-					gen.Line("var i "+rowStructName),
-					gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
-					gen.Line("return i, err"),
-				),
-			)
+			switch query.t {
+			case "one":
+				generatedFile.AddBlock(
+					gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
+						gen.Call("row", "q.db.QueryRow", callArgs...),
+						gen.Line("var i "+rowStructName),
+						gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
+						gen.Line("return i, err"),
+					),
+				)
+			case "many":
+				body := []fmt.Stringer{
+					gen.Call("rows, err", "q.db.Query", callArgs...),
+					gen.Line("if err != nil {"),
+					gen.Line("return nil, err"),
+					gen.Line("}"),
+					gen.Line("defer rows.Close()"),
+					gen.Line("var items []" + rowStructName),
+					gen.Line("for rows.Next() {"),
+					gen.Line("var i " + rowStructName),
+				}
+				body = append(body,
+					gen.Line("if err := rows.Scan("+strings.Join(scanFields, ", ")+"); err != nil {"),
+					gen.Line("return nil, err"),
+					gen.Line("}"),
+					gen.Line("items = append(items, i)"),
+					gen.Line("}"),
+					gen.Line("return items, rows.Err()"),
+				)
+				generatedFile.AddBlock(
+					gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
+				)
+			default:
+				return fmt.Errorf("query type %s not supported for SELECT", query.t)
+			}
 
 		case postgresparser.QueryCommandInsert:
+			if query.t != "exec" {
+				return fmt.Errorf("query type %s not supported for INSERT", query.t)
+			}
+
+			paramNames, paramTypes, err := c.resolveParams(parsedSQL)
+			if err != nil {
+				return err
+			}
+
+			funcParams := "ctx context.Context"
+			var callArgs []fmt.Stringer
+			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+"SQL"))
+			for i, name := range paramNames {
+				funcParams += ", " + name + " " + paramTypes[i]
+				callArgs = append(callArgs, gen.Arg(name))
+			}
+
+			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
+
+			generatedFile.AddBlock(
+				gen.MethodFunc("q *Queries", query.name, funcParams, "error",
+					gen.Call("_, err", "q.db.Exec", callArgs...),
+					gen.Line("return err"),
+				),
+			)
 		case postgresparser.QueryCommandUpdate:
+			if query.t != "exec" {
+				return fmt.Errorf("query type %s not supported for UPDATE", query.t)
+			}
+
+			paramNames, paramTypes, err := c.resolveParams(parsedSQL)
+			if err != nil {
+				return err
+			}
+
+			funcParams := "ctx context.Context"
+			var callArgs []fmt.Stringer
+			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+"SQL"))
+			for i, name := range paramNames {
+				funcParams += ", " + name + " " + paramTypes[i]
+				callArgs = append(callArgs, gen.Arg(name))
+			}
+
+			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
+
+			generatedFile.AddBlock(
+				gen.MethodFunc("q *Queries", query.name, funcParams, "error",
+					gen.Call("_, err", "q.db.Exec", callArgs...),
+					gen.Line("return err"),
+				),
+			)
 		case postgresparser.QueryCommandDelete:
 			if query.t != "exec" {
 				return fmt.Errorf("query type %s not supported for DELETE", query.t)
