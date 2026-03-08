@@ -61,7 +61,8 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 		var goType string
 		for _, ddlCol := range ddlColumns {
 			if ddlCol.Name == colName {
-				goType = pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
+				nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, parsedSQL.Tables)
+				goType = pgTypeToGoType(ddlCol.Type, nullable)
 				break
 			}
 		}

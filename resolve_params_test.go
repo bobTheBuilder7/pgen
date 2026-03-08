@@ -21,6 +21,14 @@ const usersSchemaSQL = `CREATE TABLE users (
     verified BOOLEAN NOT NULL DEFAULT false
 );`
 
+const postsSchemaSQL = `CREATE TABLE posts (
+    id BIGSERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT,
+    user_id BIGINT NOT NULL,
+    published BOOLEAN NOT NULL DEFAULT false
+);`
+
 func testCliWithUsersSchema(t *testing.T) *cli {
 	t.Helper()
 	c := &cli{}
@@ -29,6 +37,17 @@ func testCliWithUsersSchema(t *testing.T) *cli {
 		t.Fatalf("failed to parse users schema: %v", err)
 	}
 	c.tablesCol.Store("users", parsed.DDLActions[0].ColumnDetails)
+	return c
+}
+
+func testCliWithUsersAndPostsSchema(t *testing.T) *cli {
+	t.Helper()
+	c := testCliWithUsersSchema(t)
+	parsed, err := postgresparser.ParseSQLStrict(postsSchemaSQL)
+	if err != nil {
+		t.Fatalf("failed to parse posts schema: %v", err)
+	}
+	c.tablesCol.Store("posts", parsed.DDLActions[0].ColumnDetails)
 	return c
 }
 
@@ -352,4 +371,49 @@ func TestResolveParams_InsertMixedNullability(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, names, []string{"name", "age", "status", "login_count", "role_id"})
 	assert.Equal(t, types, []string{"string", "pgtype.Int2", "int16", "pgtype.Int4", "int32"})
+}
+
+// JOIN param tests
+
+func TestResolveParams_JoinSingleParam(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"id"})
+	assert.Equal(t, types, []string{"int64"})
+}
+
+func TestResolveParams_JoinParamsFromBothTables(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1 AND p.title = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"id", "title"})
+	assert.Equal(t, types, []string{"int64", "string"})
+}
+
+func TestResolveParams_LeftJoinParamFromJoinedTable(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.title FROM users u LEFT JOIN posts p ON u.id = p.user_id WHERE u.id = $1 AND p.published = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"id", "published"})
+	// published is NOT NULL in schema but LEFT JOIN makes posts columns nullable
+	assert.Equal(t, types, []string{"int64", "pgtype.Bool"})
 }

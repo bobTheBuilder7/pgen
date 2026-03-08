@@ -180,3 +180,432 @@ func TestResolveProjections_MixedAliasAndNoAlias(t *testing.T) {
 	})
 	assert.Equal(t, scans, []string{"&i.UserId", "&i.Email", "&i.Verified"})
 }
+
+func TestResolveProjections_StarSelectReturnsError(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT * FROM users WHERE users.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
+}
+
+func TestResolveProjections_StarSelectWithAliasReturnsError(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT * FROM users u WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
+}
+
+func TestResolveProjections_TableDotStarReturnsError(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.* FROM users WHERE users.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
+}
+
+func TestResolveProjections_AliasDotStarReturnsError(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.* FROM users u WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
+}
+
+func TestResolveReturning_InsertSingleColumn(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name) VALUES ($1) RETURNING id;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int64"}})
+	assert.Equal(t, scans, []string{"&i.Id"})
+}
+
+func TestResolveReturning_InsertMultipleColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+		{Name: "Email", Type: "string"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Email"})
+}
+
+func TestResolveReturning_InsertNullableColumn(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, age;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Age", Type: "pgtype.Int2"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Age"})
+}
+
+func TestResolveReturning_UpdateReturning(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1 WHERE users.id = $2 RETURNING id, name;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name"})
+}
+
+func TestResolveReturning_DeleteReturning(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM users WHERE users.id = $1 RETURNING id, name, active;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+		{Name: "Active", Type: "pgtype.Bool"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Active"})
+}
+
+// Test returning columns that are NOT in the INSERT column list
+func TestResolveReturning_InsertReturnsColumnsNotInInsertList(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, age, login_count, active, verified;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Age", Type: "pgtype.Int2"},
+		{Name: "LoginCount", Type: "pgtype.Int4"},
+		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Verified", Type: "bool"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.LoginCount", "&i.Active", "&i.Verified"})
+}
+
+// Test returning only nullable columns
+func TestResolveReturning_OnlyNullableColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING age, login_count, referrer_id, active;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Age", Type: "pgtype.Int2"},
+		{Name: "LoginCount", Type: "pgtype.Int4"},
+		{Name: "ReferrerId", Type: "pgtype.Int8"},
+		{Name: "Active", Type: "pgtype.Bool"},
+	})
+	assert.Equal(t, scans, []string{"&i.Age", "&i.LoginCount", "&i.ReferrerId", "&i.Active"})
+}
+
+// Test returning all 11 columns from INSERT
+func TestResolveReturning_InsertReturnsAllColumns(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, status) VALUES ($1, $2, $3) RETURNING id, name, email, age, status, role_id, login_count, org_id, referrer_id, active, verified;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+		{Name: "Email", Type: "string"},
+		{Name: "Age", Type: "pgtype.Int2"},
+		{Name: "Status", Type: "int16"},
+		{Name: "RoleId", Type: "int32"},
+		{Name: "LoginCount", Type: "pgtype.Int4"},
+		{Name: "OrgId", Type: "int64"},
+		{Name: "ReferrerId", Type: "pgtype.Int8"},
+		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Verified", Type: "bool"},
+	})
+	assert.Equal(t, scans, []string{
+		"&i.Id", "&i.Name", "&i.Email", "&i.Age", "&i.Status",
+		"&i.RoleId", "&i.LoginCount", "&i.OrgId", "&i.ReferrerId",
+		"&i.Active", "&i.Verified",
+	})
+}
+
+// Test nullable vs not-null booleans in RETURNING
+func TestResolveReturning_BooleanNullability(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1 WHERE users.id = $2 RETURNING active, verified;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Verified", Type: "bool"},
+	})
+	assert.Equal(t, scans, []string{"&i.Active", "&i.Verified"})
+}
+
+// Test same RETURNING columns across all three DML types for consistency
+func TestResolveReturning_ConsistentAcrossInsertUpdateDelete(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	returningCols := "RETURNING id, name, age, role_id, active;"
+
+	insertSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) ` + returningCols)
+	if err != nil {
+		t.Fatalf("failed to parse INSERT: %v", err)
+	}
+	updateSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET email = $1 WHERE users.id = $2 ` + returningCols)
+	if err != nil {
+		t.Fatalf("failed to parse UPDATE: %v", err)
+	}
+	deleteSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM users WHERE users.id = $1 ` + returningCols)
+	if err != nil {
+		t.Fatalf("failed to parse DELETE: %v", err)
+	}
+
+	expectedFields := []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+		{Name: "Age", Type: "pgtype.Int2"},
+		{Name: "RoleId", Type: "int32"},
+		{Name: "Active", Type: "pgtype.Bool"},
+	}
+	expectedScans := []string{"&i.Id", "&i.Name", "&i.Age", "&i.RoleId", "&i.Active"}
+
+	insertFields, insertScans, err := c.resolveReturning(insertSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, insertFields, expectedFields)
+	assert.Equal(t, insertScans, expectedScans)
+
+	updateFields, updateScans, err := c.resolveReturning(updateSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, updateFields, expectedFields)
+	assert.Equal(t, updateScans, expectedScans)
+
+	deleteFields, deleteScans, err := c.resolveReturning(deleteSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, deleteFields, expectedFields)
+	assert.Equal(t, deleteScans, expectedScans)
+}
+
+// Test alternating nullable/not-null int sizes in RETURNING
+func TestResolveReturning_AlternatingNullableIntSizes(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	// age(nullable smallint), status(not-null smallint), login_count(nullable int), role_id(not-null int), referrer_id(nullable bigint), org_id(not-null bigint)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM users WHERE users.id = $1 RETURNING age, status, login_count, role_id, referrer_id, org_id;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Age", Type: "pgtype.Int2"},
+		{Name: "Status", Type: "int16"},
+		{Name: "LoginCount", Type: "pgtype.Int4"},
+		{Name: "RoleId", Type: "int32"},
+		{Name: "ReferrerId", Type: "pgtype.Int8"},
+		{Name: "OrgId", Type: "int64"},
+	})
+	assert.Equal(t, scans, []string{"&i.Age", "&i.Status", "&i.LoginCount", "&i.RoleId", "&i.ReferrerId", "&i.OrgId"})
+}
+
+// Test UPDATE returning the column being set + other columns
+func TestResolveReturning_UpdateReturnsSetColumnAndOthers(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1, active = $2 WHERE users.id = $3 RETURNING id, name, email, active, verified;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveReturning(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+		{Name: "Email", Type: "string"},
+		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Verified", Type: "bool"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Email", "&i.Active", "&i.Verified"})
+}
+
+// JOIN tests
+
+func TestResolveProjections_InnerJoinColumnsFromBothTables(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.name, p.id as post_id, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Name", Type: "string"},
+		{Name: "PostId", Type: "int64"},
+		{Name: "Title", Type: "string"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title"})
+}
+
+func TestResolveProjections_LeftJoinForcesNullableOnJoinedTable(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.name, p.id as post_id, p.title, p.published FROM users u LEFT JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},         // users.id — NOT NULL, base table
+		{Name: "Name", Type: "string"},       // users.name — NOT NULL, base table
+		{Name: "PostId", Type: "pgtype.Int8"}, // posts.id — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Title", Type: "pgtype.Text"},  // posts.title — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Published", Type: "pgtype.Bool"}, // posts.published — NOT NULL but LEFT JOIN makes it nullable
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title", "&i.Published"})
+}
+
+func TestResolveProjections_LeftJoinNullableColumnStaysNullable(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	// posts.body is already nullable in schema, LEFT JOIN should still produce pgtype.Text
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.body FROM users u LEFT JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Body", Type: "pgtype.Text"},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Body"})
+}
+
+func TestResolveProjections_InnerJoinDoesNotForceNullable(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.title, p.published FROM users u INNER JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},
+		{Name: "Title", Type: "string"},    // NOT NULL, INNER JOIN doesn't force nullable
+		{Name: "Published", Type: "bool"},  // NOT NULL, INNER JOIN doesn't force nullable
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Title", "&i.Published"})
+}
+
+func TestResolveProjections_RightJoinForcesNullableOnBaseTable(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.name, p.title FROM users u RIGHT JOIN posts p ON u.id = p.user_id WHERE p.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "pgtype.Int8"},   // users.id — NOT NULL but RIGHT JOIN makes base table nullable
+		{Name: "Name", Type: "pgtype.Text"}, // users.name — NOT NULL but RIGHT JOIN makes base table nullable
+		{Name: "Title", Type: "string"},      // posts.title — NOT NULL, joined table in RIGHT JOIN keeps types
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Title"})
+}
+
+func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	// INNER JOIN: nullable columns stay nullable, not-null stay not-null
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.age, p.title, p.body FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64"},         // users.id — NOT NULL
+		{Name: "Age", Type: "pgtype.Int2"},  // users.age — nullable in schema
+		{Name: "Title", Type: "string"},     // posts.title — NOT NULL
+		{Name: "Body", Type: "pgtype.Text"}, // posts.body — nullable in schema
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.Title", "&i.Body"})
+}

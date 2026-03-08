@@ -61,16 +61,13 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	generatedFile := gen.NewFile("db")
 
 	generatedFile.AddBlock(gen.Import("", "context"))
+	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
 	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 
 	for _, query := range queries {
 		parsedSQL, err := postgresparser.ParseSQLStrict(query.sql)
 		if err != nil {
 			return err
-		}
-
-		if len(parsedSQL.Tables) != 1 {
-			return errors.New("complex query: multiple tables not yet supported")
 		}
 
 		switch command := parsedSQL.Command; command {
@@ -91,7 +88,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			// Build function signature params
 			funcParams := "ctx context.Context"
 			var callArgs []fmt.Stringer
-			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+"SQL"))
+			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+sqlConstSuffix))
 			for i, name := range paramNames {
 				funcParams += ", " + name + " " + paramTypes[i]
 				callArgs = append(callArgs, gen.Arg(name))
@@ -101,7 +98,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			generatedFile.AddBlock(gen.Struct(rowStructName, structFields...))
 
 			// Generate SQL const
-			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
+			generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(query.sql)))
 
 			switch query.t {
 			case "one":
@@ -135,88 +132,24 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 				generatedFile.AddBlock(
 					gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
 				)
+			case "exec", "execresult":
+				return c.generateExec(generatedFile, query, parsedSQL)
 			default:
 				return fmt.Errorf("query type %s not supported for SELECT", query.t)
 			}
 
 		case postgresparser.QueryCommandInsert:
-			if query.t != "exec" {
-				return fmt.Errorf("query type %s not supported for INSERT", query.t)
-			}
-
-			paramNames, paramTypes, err := c.resolveParams(parsedSQL)
-			if err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL); err != nil {
 				return err
 			}
-
-			funcParams := "ctx context.Context"
-			var callArgs []fmt.Stringer
-			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+"SQL"))
-			for i, name := range paramNames {
-				funcParams += ", " + name + " " + paramTypes[i]
-				callArgs = append(callArgs, gen.Arg(name))
-			}
-
-			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
-
-			generatedFile.AddBlock(
-				gen.MethodFunc("q *Queries", query.name, funcParams, "error",
-					gen.Call("_, err", "q.db.Exec", callArgs...),
-					gen.Line("return err"),
-				),
-			)
 		case postgresparser.QueryCommandUpdate:
-			if query.t != "exec" {
-				return fmt.Errorf("query type %s not supported for UPDATE", query.t)
-			}
-
-			paramNames, paramTypes, err := c.resolveParams(parsedSQL)
-			if err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL); err != nil {
 				return err
 			}
-
-			funcParams := "ctx context.Context"
-			var callArgs []fmt.Stringer
-			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+"SQL"))
-			for i, name := range paramNames {
-				funcParams += ", " + name + " " + paramTypes[i]
-				callArgs = append(callArgs, gen.Arg(name))
-			}
-
-			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
-
-			generatedFile.AddBlock(
-				gen.MethodFunc("q *Queries", query.name, funcParams, "error",
-					gen.Call("_, err", "q.db.Exec", callArgs...),
-					gen.Line("return err"),
-				),
-			)
 		case postgresparser.QueryCommandDelete:
-			if query.t != "exec" {
-				return fmt.Errorf("query type %s not supported for DELETE", query.t)
-			}
-
-			paramNames, paramTypes, err := c.resolveParams(parsedSQL)
-			if err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL); err != nil {
 				return err
 			}
-
-			funcParams := "ctx context.Context"
-			var callArgs []fmt.Stringer
-			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+"SQL"))
-			for i, name := range paramNames {
-				funcParams += ", " + name + " " + paramTypes[i]
-				callArgs = append(callArgs, gen.Arg(name))
-			}
-
-			generatedFile.AddBlock(gen.Const(query.name+"SQL", gen.String(query.sql)))
-
-			generatedFile.AddBlock(
-				gen.MethodFunc("q *Queries", query.name, funcParams, "error",
-					gen.Call("_, err", "q.db.Exec", callArgs...),
-					gen.Line("return err"),
-				),
-			)
 		default:
 			return errors.New("not implemented")
 		}
@@ -228,6 +161,103 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	}
 
 	return nil
+}
+
+func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *postgresparser.ParsedQuery) error {
+	hasReturning := len(parsedSQL.Returning) > 0
+
+	if !hasReturning && query.t != "exec" && query.t != "execresult" {
+		return fmt.Errorf("query type %s not supported for %s without RETURNING", query.t, parsedSQL.Command)
+	}
+	if hasReturning && query.t != "one" && query.t != "many" {
+		return fmt.Errorf("query type %s not supported for %s with RETURNING (use :one or :many)", query.t, parsedSQL.Command)
+	}
+
+	paramNames, paramTypes, err := c.resolveParams(parsedSQL)
+	if err != nil {
+		return err
+	}
+
+	funcParams := "ctx context.Context"
+	var callArgs []fmt.Stringer
+	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+sqlConstSuffix))
+	for i, name := range paramNames {
+		funcParams += ", " + name + " " + paramTypes[i]
+		callArgs = append(callArgs, gen.Arg(name))
+	}
+
+	generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(query.sql)))
+
+	if hasReturning {
+		structFields, scanFields, err := c.resolveReturning(parsedSQL)
+		if err != nil {
+			return err
+		}
+
+		rowStructName := query.name + "Row"
+		generatedFile.AddBlock(gen.Struct(rowStructName, structFields...))
+
+		switch query.t {
+		case "one":
+			generatedFile.AddBlock(
+				gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
+					gen.Call("row", "q.db.QueryRow", callArgs...),
+					gen.Line("var i "+rowStructName),
+					gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
+					gen.Line("return i, err"),
+				),
+			)
+		case "many":
+			body := []fmt.Stringer{
+				gen.Call("rows, err", "q.db.Query", callArgs...),
+				gen.Line("if err != nil {"),
+				gen.Line("return nil, err"),
+				gen.Line("}"),
+				gen.Line("defer rows.Close()"),
+				gen.Line("var items []" + rowStructName),
+				gen.Line("for rows.Next() {"),
+				gen.Line("var i " + rowStructName),
+			}
+			body = append(body,
+				gen.Line("if err := rows.Scan("+strings.Join(scanFields, ", ")+"); err != nil {"),
+				gen.Line("return nil, err"),
+				gen.Line("}"),
+				gen.Line("items = append(items, i)"),
+				gen.Line("}"),
+				gen.Line("return items, rows.Err()"),
+			)
+			generatedFile.AddBlock(
+				gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
+			)
+		}
+		return nil
+	}
+
+	switch query.t {
+	case "exec":
+		generatedFile.AddBlock(
+			gen.MethodFunc("q *Queries", query.name, funcParams, "error",
+				gen.Call("_, err", "q.db.Exec", callArgs...),
+				gen.Line("return err"),
+			),
+		)
+	case "execresult":
+		generatedFile.AddBlock(
+			gen.MethodFunc("q *Queries", query.name, funcParams, "(pgconn.CommandTag, error)",
+				gen.Line("return q.db.Exec("+buildCallArgsString(callArgs)+")"),
+			),
+		)
+	}
+
+	return nil
+}
+
+func buildCallArgsString(args []fmt.Stringer) string {
+	parts := make([]string, len(args))
+	for i, a := range args {
+		parts[i] = a.String()
+	}
+	return strings.Join(parts, ", ")
 }
 
 func stringersFromStrings(ss []string) []fmt.Stringer {
@@ -248,14 +278,4 @@ func filterColumns(columns []postgresparser.ColumnUsage, usage postgresparser.Co
 	}
 
 	return cols
-}
-
-func findTable(tables []postgresparser.TableRef, search string) (postgresparser.TableRef, error) {
-	for _, table := range tables {
-		if table.Name == search || table.Alias == search {
-			return table, nil
-		}
-	}
-
-	return postgresparser.TableRef{}, fmt.Errorf("table %s not found", search)
 }

@@ -10,6 +10,7 @@ import (
 const dbDirectory = "db"
 const queriesDirectory = "query"
 const schemaDirectory = "schema"
+const sqlConstSuffix = "SQL"
 
 type cli struct {
 	tablesCol syncmap.Map[string, []postgresparser.DDLColumn]

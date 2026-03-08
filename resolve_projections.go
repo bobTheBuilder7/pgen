@@ -17,6 +17,11 @@ func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables [
 	var scanFields []string
 
 	for _, col := range columns {
+		expr := strings.TrimSpace(col.Expression)
+		if expr == "*" || strings.HasSuffix(expr, ".*") {
+			return nil, nil, fmt.Errorf("SELECT * is not supported: explicitly list the columns you need")
+		}
+
 		goType, err := c.resolveColumnGoType(col, tables)
 		if err != nil {
 			return nil, nil, err
@@ -82,9 +87,83 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
-			return pgTypeToGoType(ddlCol.Type, ddlCol.Nullable), nil
+			nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, tables)
+			return pgTypeToGoType(ddlCol.Type, nullable), nil
 		}
 	}
 
 	return "string", nil
+}
+
+// isOuterJoinNullable returns true if columns from the given table should be
+// treated as nullable due to an outer join. LEFT JOIN makes the joined table
+// nullable, RIGHT JOIN makes the base table nullable, FULL makes both nullable.
+func isOuterJoinNullable(tableName string, tables []postgresparser.TableRef) bool {
+	for _, t := range tables {
+		if t.Name == tableName {
+			// This table is LEFT or FULL joined → its columns are nullable
+			if t.JoinType == "LEFT" || t.JoinType == "FULL" {
+				return true
+			}
+		} else {
+			// Another table is RIGHT or FULL joined → base table columns are nullable
+			if t.JoinType == "RIGHT" || t.JoinType == "FULL" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// resolveReturning resolves the Go struct fields and scan field references
+// from RETURNING clause columns in INSERT/UPDATE/DELETE statements.
+func (c *cli) resolveReturning(parsedSQL *postgresparser.ParsedQuery) ([]gen.Field, []string, error) {
+	returningCols := filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeReturning)
+	if len(returningCols) == 0 {
+		return nil, nil, fmt.Errorf("no RETURNING columns found")
+	}
+
+	var structFields []gen.Field
+	var scanFields []string
+
+	for _, col := range returningCols {
+		// Resolve table name from alias, default to first table if unqualified
+		var tableName string
+		if col.TableAlias != "" {
+			for _, t := range parsedSQL.Tables {
+				if t.Alias == col.TableAlias || t.Name == col.TableAlias {
+					tableName = t.Name
+					break
+				}
+			}
+		} else if len(parsedSQL.Tables) == 1 {
+			tableName = parsedSQL.Tables[0].Name
+		}
+
+		if tableName == "" {
+			return nil, nil, fmt.Errorf("could not resolve table for returning column %s", col.Column)
+		}
+
+		ddlColumns, ok := c.tablesCol.Load(tableName)
+		if !ok {
+			return nil, nil, fmt.Errorf("table %s not found in schema", tableName)
+		}
+
+		var goType string
+		for _, ddlCol := range ddlColumns {
+			if ddlCol.Name == col.Column {
+				goType = pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
+				break
+			}
+		}
+		if goType == "" {
+			return nil, nil, fmt.Errorf("column %s not found in table %s", col.Column, tableName)
+		}
+
+		fieldName := utils.ToPascalCase(col.Column)
+		structFields = append(structFields, gen.Field{Name: fieldName, Type: goType})
+		scanFields = append(scanFields, "&i."+fieldName)
+	}
+
+	return structFields, scanFields, nil
 }

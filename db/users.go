@@ -1,7 +1,11 @@
 package db
 
-import "context"
-import "github.com/jackc/pgx/v5/pgtype"
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+)
 
 type GetUserByIDRow struct {
 	Id   int64
@@ -55,6 +59,64 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	for rows.Next() {
 		var i ListUsersRow
 		if err := rows.Scan(&i.Id, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
+}
+
+const DeleteUserByNameSQL = "DELETE FROM users WHERE users.name = $1;"
+
+func (q *Queries) DeleteUserByName(ctx context.Context, name string) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, DeleteUserByNameSQL, name)
+}
+
+const UpdateUserAgeSQL = "UPDATE users SET age = $1 WHERE users.id = $2;"
+
+func (q *Queries) UpdateUserAge(ctx context.Context, age pgtype.Int4, id int64) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, UpdateUserAgeSQL, age, id)
+}
+
+const InsertUserSQL = "INSERT INTO users (name, age) VALUES ($1, $2);"
+
+func (q *Queries) InsertUser(ctx context.Context, name string, age pgtype.Int4) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, InsertUserSQL, name, age)
+}
+
+const InsertUserReturningSQL = "INSERT INTO users (name, age) VALUES ($1, $2) RETURNING id, name;"
+
+type InsertUserReturningRow struct {
+	Id   int64
+	Name string
+}
+
+func (q *Queries) InsertUserReturning(ctx context.Context, name string, age pgtype.Int4) (InsertUserReturningRow, error) {
+	row := q.db.QueryRow(ctx, InsertUserReturningSQL, name, age)
+	var i InsertUserReturningRow
+	err := row.Scan(&i.Id, &i.Name)
+	return i, err
+}
+
+type GetUserPostsRow struct {
+	Id       int64
+	Name     string
+	PostId   int64
+	PostName string
+}
+
+const GetUserPostsSQL = "SELECT u.id, u.name, p.id as post_id, p.name as post_name FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;"
+
+func (q *Queries) GetUserPosts(ctx context.Context, id int64) ([]GetUserPostsRow, error) {
+	rows, err := q.db.Query(ctx, GetUserPostsSQL, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserPostsRow
+	for rows.Next() {
+		var i GetUserPostsRow
+		if err := rows.Scan(&i.Id, &i.Name, &i.PostId, &i.PostName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
