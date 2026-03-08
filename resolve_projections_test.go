@@ -18,7 +18,7 @@ func TestResolveProjections_SingleBigintColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int64"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int64", Tag: `json:"id"`}})
 	assert.Equal(t, scans, []string{"&i.Id"})
 }
 
@@ -32,7 +32,7 @@ func TestResolveProjections_SingleTextColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Name", Type: "string"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Name", Type: "string", Tag: `json:"name"`}})
 	assert.Equal(t, scans, []string{"&i.Name"})
 }
 
@@ -46,7 +46,7 @@ func TestResolveProjections_VarcharColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Email", Type: "string"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Email", Type: "string", Tag: `json:"email"`}})
 	assert.Equal(t, scans, []string{"&i.Email"})
 }
 
@@ -60,7 +60,7 @@ func TestResolveProjections_SmallintColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Status", Type: "int16"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Status", Type: "int16", Tag: `json:"status"`}})
 	assert.Equal(t, scans, []string{"&i.Status"})
 }
 
@@ -74,7 +74,7 @@ func TestResolveProjections_IntegerColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "RoleId", Type: "int32"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`}})
 	assert.Equal(t, scans, []string{"&i.RoleId"})
 }
 
@@ -88,7 +88,7 @@ func TestResolveProjections_BooleanColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Verified", Type: "bool"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Verified", Type: "bool", Tag: `json:"verified"`}})
 	assert.Equal(t, scans, []string{"&i.Verified"})
 }
 
@@ -103,9 +103,9 @@ func TestResolveProjections_MultipleColumns(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Active"})
 }
@@ -121,9 +121,9 @@ func TestResolveProjections_AliasedTable(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Email", Type: "string"},
-		{Name: "RoleId", Type: "int32"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Email", Type: "string", Tag: `json:"email"`},
+		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Email", "&i.RoleId"})
 }
@@ -139,8 +139,8 @@ func TestResolveProjections_ColumnAlias(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "UserId", Type: "int64"},
-		{Name: "UserName", Type: "string"},
+		{Name: "UserId", Type: "int64", Tag: `json:"user_id"`},
+		{Name: "UserName", Type: "string", Tag: `json:"user_name"`},
 	})
 	assert.Equal(t, scans, []string{"&i.UserId", "&i.UserName"})
 }
@@ -156,9 +156,9 @@ func TestResolveProjections_AllIntSizes(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Age", Type: "pgtype.Int2"},
-		{Name: "RoleId", Type: "int32"},
-		{Name: "OrgId", Type: "int64"},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
+		{Name: "OrgId", Type: "int64", Tag: `json:"org_id"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Age", "&i.RoleId", "&i.OrgId"})
 }
@@ -174,9 +174,9 @@ func TestResolveProjections_MixedAliasAndNoAlias(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "UserId", Type: "int64"},
-		{Name: "Email", Type: "string"},
-		{Name: "Verified", Type: "bool"},
+		{Name: "UserId", Type: "int64", Tag: `json:"user_id"`},
+		{Name: "Email", Type: "string", Tag: `json:"email"`},
+		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
 	})
 	assert.Equal(t, scans, []string{"&i.UserId", "&i.Email", "&i.Verified"})
 }
@@ -243,7 +243,7 @@ func TestResolveReturning_InsertSingleColumn(t *testing.T) {
 
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int64"}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int64", Tag: `json:"id"`}})
 	assert.Equal(t, scans, []string{"&i.Id"})
 }
 
@@ -258,9 +258,9 @@ func TestResolveReturning_InsertMultipleColumns(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "Email", Type: "string"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Email", Type: "string", Tag: `json:"email"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Email"})
 }
@@ -276,8 +276,8 @@ func TestResolveReturning_InsertNullableColumn(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Age", Type: "pgtype.Int2"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Age"})
 }
@@ -293,8 +293,8 @@ func TestResolveReturning_UpdateReturning(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name"})
 }
@@ -310,9 +310,9 @@ func TestResolveReturning_DeleteReturning(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Active"})
 }
@@ -329,11 +329,11 @@ func TestResolveReturning_InsertReturnsColumnsNotInInsertList(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Age", Type: "pgtype.Int2"},
-		{Name: "LoginCount", Type: "pgtype.Int4"},
-		{Name: "Active", Type: "pgtype.Bool"},
-		{Name: "Verified", Type: "bool"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.LoginCount", "&i.Active", "&i.Verified"})
 }
@@ -350,10 +350,10 @@ func TestResolveReturning_OnlyNullableColumns(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Age", Type: "pgtype.Int2"},
-		{Name: "LoginCount", Type: "pgtype.Int4"},
-		{Name: "ReferrerId", Type: "pgtype.Int8"},
-		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
+		{Name: "ReferrerId", Type: "pgtype.Int8", Tag: `json:"referrer_id"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Age", "&i.LoginCount", "&i.ReferrerId", "&i.Active"})
 }
@@ -370,17 +370,17 @@ func TestResolveReturning_InsertReturnsAllColumns(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "Email", Type: "string"},
-		{Name: "Age", Type: "pgtype.Int2"},
-		{Name: "Status", Type: "int16"},
-		{Name: "RoleId", Type: "int32"},
-		{Name: "LoginCount", Type: "pgtype.Int4"},
-		{Name: "OrgId", Type: "int64"},
-		{Name: "ReferrerId", Type: "pgtype.Int8"},
-		{Name: "Active", Type: "pgtype.Bool"},
-		{Name: "Verified", Type: "bool"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Email", Type: "string", Tag: `json:"email"`},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "Status", Type: "int16", Tag: `json:"status"`},
+		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
+		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
+		{Name: "OrgId", Type: "int64", Tag: `json:"org_id"`},
+		{Name: "ReferrerId", Type: "pgtype.Int8", Tag: `json:"referrer_id"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
 	})
 	assert.Equal(t, scans, []string{
 		"&i.Id", "&i.Name", "&i.Email", "&i.Age", "&i.Status",
@@ -401,8 +401,8 @@ func TestResolveReturning_BooleanNullability(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Active", Type: "pgtype.Bool"},
-		{Name: "Verified", Type: "bool"},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Active", "&i.Verified"})
 }
@@ -427,11 +427,11 @@ func TestResolveReturning_ConsistentAcrossInsertUpdateDelete(t *testing.T) {
 	}
 
 	expectedFields := []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "Age", Type: "pgtype.Int2"},
-		{Name: "RoleId", Type: "int32"},
-		{Name: "Active", Type: "pgtype.Bool"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
 	}
 	expectedScans := []string{"&i.Id", "&i.Name", "&i.Age", "&i.RoleId", "&i.Active"}
 
@@ -464,12 +464,12 @@ func TestResolveReturning_AlternatingNullableIntSizes(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Age", Type: "pgtype.Int2"},
-		{Name: "Status", Type: "int16"},
-		{Name: "LoginCount", Type: "pgtype.Int4"},
-		{Name: "RoleId", Type: "int32"},
-		{Name: "ReferrerId", Type: "pgtype.Int8"},
-		{Name: "OrgId", Type: "int64"},
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "Status", Type: "int16", Tag: `json:"status"`},
+		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
+		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
+		{Name: "ReferrerId", Type: "pgtype.Int8", Tag: `json:"referrer_id"`},
+		{Name: "OrgId", Type: "int64", Tag: `json:"org_id"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Age", "&i.Status", "&i.LoginCount", "&i.RoleId", "&i.ReferrerId", "&i.OrgId"})
 }
@@ -486,11 +486,11 @@ func TestResolveReturning_UpdateReturnsSetColumnAndOthers(t *testing.T) {
 	fields, scans, err := c.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "Email", Type: "string"},
-		{Name: "Active", Type: "pgtype.Bool"},
-		{Name: "Verified", Type: "bool"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Email", Type: "string", Tag: `json:"email"`},
+		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Email", "&i.Active", "&i.Verified"})
 }
@@ -508,10 +508,10 @@ func TestResolveProjections_InnerJoinColumnsFromBothTables(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Name", Type: "string"},
-		{Name: "PostId", Type: "int64"},
-		{Name: "Title", Type: "string"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "PostId", Type: "int64", Tag: `json:"post_id"`},
+		{Name: "Title", Type: "string", Tag: `json:"title"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title"})
 }
@@ -527,11 +527,11 @@ func TestResolveProjections_LeftJoinForcesNullableOnJoinedTable(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},         // users.id — NOT NULL, base table
-		{Name: "Name", Type: "string"},       // users.name — NOT NULL, base table
-		{Name: "PostId", Type: "pgtype.Int8"}, // posts.id — NOT NULL in schema but LEFT JOIN makes it nullable
-		{Name: "Title", Type: "pgtype.Text"},  // posts.title — NOT NULL in schema but LEFT JOIN makes it nullable
-		{Name: "Published", Type: "pgtype.Bool"}, // posts.published — NOT NULL but LEFT JOIN makes it nullable
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},              // users.id — NOT NULL, base table
+		{Name: "Name", Type: "string", Tag: `json:"name"`},          // users.name — NOT NULL, base table
+		{Name: "PostId", Type: "pgtype.Int8", Tag: `json:"post_id"`}, // posts.id — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Title", Type: "pgtype.Text", Tag: `json:"title"`},    // posts.title — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Published", Type: "pgtype.Bool", Tag: `json:"published"`}, // posts.published — NOT NULL but LEFT JOIN makes it nullable
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title", "&i.Published"})
 }
@@ -548,8 +548,8 @@ func TestResolveProjections_LeftJoinNullableColumnStaysNullable(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Body", Type: "pgtype.Text"},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Body", Type: "pgtype.Text", Tag: `json:"body"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Body"})
 }
@@ -565,9 +565,9 @@ func TestResolveProjections_InnerJoinDoesNotForceNullable(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},
-		{Name: "Title", Type: "string"},    // NOT NULL, INNER JOIN doesn't force nullable
-		{Name: "Published", Type: "bool"},  // NOT NULL, INNER JOIN doesn't force nullable
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Title", Type: "string", Tag: `json:"title"`},     // NOT NULL, INNER JOIN doesn't force nullable
+		{Name: "Published", Type: "bool", Tag: `json:"published"`}, // NOT NULL, INNER JOIN doesn't force nullable
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Title", "&i.Published"})
 }
@@ -583,9 +583,9 @@ func TestResolveProjections_RightJoinForcesNullableOnBaseTable(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "pgtype.Int8"},   // users.id — NOT NULL but RIGHT JOIN makes base table nullable
-		{Name: "Name", Type: "pgtype.Text"}, // users.name — NOT NULL but RIGHT JOIN makes base table nullable
-		{Name: "Title", Type: "string"},      // posts.title — NOT NULL, joined table in RIGHT JOIN keeps types
+		{Name: "Id", Type: "pgtype.Int8", Tag: `json:"id"`},     // users.id — NOT NULL but RIGHT JOIN makes base table nullable
+		{Name: "Name", Type: "pgtype.Text", Tag: `json:"name"`}, // users.name — NOT NULL but RIGHT JOIN makes base table nullable
+		{Name: "Title", Type: "string", Tag: `json:"title"`},     // posts.title — NOT NULL, joined table in RIGHT JOIN keeps types
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Title"})
 }
@@ -602,10 +602,83 @@ func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64"},         // users.id — NOT NULL
-		{Name: "Age", Type: "pgtype.Int2"},  // users.age — nullable in schema
-		{Name: "Title", Type: "string"},     // posts.title — NOT NULL
-		{Name: "Body", Type: "pgtype.Text"}, // posts.body — nullable in schema
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},           // users.id — NOT NULL
+		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},   // users.age — nullable in schema
+		{Name: "Title", Type: "string", Tag: `json:"title"`},     // posts.title — NOT NULL
+		{Name: "Body", Type: "pgtype.Text", Tag: `json:"body"`}, // posts.body — nullable in schema
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.Title", "&i.Body"})
+}
+
+// Subquery tests — projections
+
+func TestResolveProjections_WhereInSubqueryColumns(t *testing.T) {
+	// WHERE IN subquery: parser only exposes outer table columns in Columns
+	// The subquery's table (posts) is not in Tables, only users is
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE users.id IN (SELECT posts.user_id FROM posts WHERE posts.title = $1);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name"})
+}
+
+func TestResolveProjections_ExistsSubqueryColumns(t *testing.T) {
+	// EXISTS subquery: parser only exposes outer table columns
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE EXISTS (SELECT 1 FROM posts WHERE posts.user_id = users.id) AND users.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name"})
+}
+
+func TestResolveProjections_ScalarSubqueryInSelect(t *testing.T) {
+	// Scalar subquery in SELECT: the entire subquery becomes a column expression
+	// Our code won't find a table.column pattern, so it falls through to "string"
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, (SELECT COUNT(*) FROM posts WHERE posts.user_id = users.id) as post_count FROM users WHERE users.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "PostCount", Type: "string", Tag: `json:"post_count"`}, // scalar subquery falls through to default string
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.PostCount"})
+}
+
+func TestResolveProjections_FromSubqueryErrors(t *testing.T) {
+	// FROM subquery: parser creates a "sub" table (type=subquery) which is not in schema
+	// Columns reference sub.id and sub.name which won't resolve
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT sub.id, sub.name FROM (SELECT users.id, users.name FROM users WHERE users.age > $1) sub WHERE sub.id = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `table sub not found`)
 }

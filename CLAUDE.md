@@ -36,13 +36,16 @@ Phase 1 must fully complete before phase 2 starts (phase 2 depends on `tablesCol
 
 | File | Purpose |
 |---|---|
-| `main.go` | Entry point. Defines `cli` struct, `ToPascalCase` helper, directory constants (`db`, `query`, `schema`). |
+| `main.go` | Entry point. Defines `cli` struct, directory constants (`db`, `query`, `schema`), `sqlConstSuffix` const. |
 | `run.go` | Orchestrates the two-phase pipeline. Creates `cli`, runs schema parsing then query codegen. |
 | `parse_schema.go` | `c.parseSchema()` — reads a schema `.sql` file, validates it's a single `CREATE TABLE`, stores columns in `c.tablesCol`. |
-| `parse_to_query.go` | `parseFileToQueries()` — reads a query `.sql` file, splits on `-- name:` annotations, returns `[]Query` (each has `name`, `t` for query type, `sql`). |
-| `generator.go` | `c.generateCode()` — main code generation. For each query: parses SQL, resolves types, generates Go structs + methods using the `gen` library. Also contains `pgTypeToGoType()`, `c.resolveColumnGoType()`, `filterColumns()`, `findTable()`. |
-| `resolver.go` | `c.resolveParams()` — resolves function parameter names and Go types from WHERE clause filter columns matched to `$1`, `$2`, etc. |
+| `parse_query.go` | `parseFileToQueries()` — reads a query `.sql` file, splits on `-- name:` annotations, returns `[]Query` (each has `name`, `t` for query type, `sql`). |
+| `generator.go` | `c.generateCode()` — main code generation. Contains `pgTypeToGoType()`, `generateExec()`, `filterColumns()`, `buildCallArgsString()`, `stringersFromStrings()`. Handles SELECT `:one`/`:many`/`:exec`/`:execresult`, delegates INSERT/UPDATE/DELETE to `generateExec`. |
+| `resolve_projections.go` | `c.resolveProjections()` — resolves Go struct fields and scan fields from SELECT columns. Also contains `resolveColumnGoType()`, `isOuterJoinNullable()`, `resolveReturning()`. |
+| `resolve_params.go` | `c.resolveParams()` — resolves function parameter names and Go types. Handles SELECT/DELETE (WHERE filters), UPDATE (SET + WHERE), INSERT (positional via `InsertColumns`). Also contains `resolveInsertParams()`. |
+| `utils/utils.go` | `ToPascalCase` helper function. |
 | `db/db.go` | Hand-written base for generated code: `DBTX` interface, `Queries` struct, `New()`, `WithTx()`. Do not edit generated files in `db/` other than this one. |
+| `experiments/main.go` | Test harness for exploring `postgresparser` behavior interactively. Listed in `.gitignore`. |
 
 ### Query annotation format
 
@@ -51,7 +54,14 @@ Phase 1 must fully complete before phase 2 starts (phase 2 depends on `tablesCol
 SELECT ...;
 ```
 
-`queryType` is `:one`, `:many`, etc. Currently only `:one` is implemented for SELECT.
+`queryType` determines the generated method's return type and behavior:
+
+| Query Type | Applies To | Returns |
+|---|---|---|
+| `:one` | SELECT, INSERT/UPDATE/DELETE with RETURNING | `(RowStruct, error)` — uses `QueryRow` + `Scan` |
+| `:many` | SELECT, INSERT/UPDATE/DELETE with RETURNING | `([]RowStruct, error)` — uses `Query` + rows iteration |
+| `:exec` | SELECT, INSERT, UPDATE, DELETE | `error` — uses `Exec`, discards result |
+| `:execresult` | SELECT, INSERT, UPDATE, DELETE | `(pgconn.CommandTag, error)` — uses `Exec`, returns command tag |
 
 ### What `:one` SELECT generates
 
@@ -68,27 +78,41 @@ The generator produces:
 
 ### How type resolution works
 
-1. **Column type resolution** (`c.resolveColumnGoType` in `generator.go`): For each SELECT column, parses `table.column` or `alias.column`, looks up the table in `c.tablesCol`, finds the DDL column, maps its PG type to Go via `pgTypeToGoType`.
+1. **Column type resolution** (`c.resolveColumnGoType` in `resolve_projections.go`): For each SELECT column, parses `table.column` or `alias.column`, looks up the table in `c.tablesCol`, finds the DDL column, maps its PG type to Go via `pgTypeToGoType`. Handles outer join nullability via `isOuterJoinNullable`.
 
-2. **Parameter type resolution** (`c.resolveParams` in `resolver.go`): For each `$N` parameter, matches it to the Nth filter-type `ColumnUsage` entry, then resolves the Go type through the same schema lookup chain.
+2. **Parameter type resolution** (`c.resolveParams` in `resolve_params.go`): For SELECT/DELETE, matches `$N` to the Nth filter-type `ColumnUsage`. For UPDATE, SET columns come first, then filter columns. For INSERT, uses `InsertColumns` positionally. Handles outer join nullability.
 
-3. **PG to Go type mapping** (`pgTypeToGoType` in `generator.go`):
+3. **RETURNING resolution** (`c.resolveReturning` in `resolve_projections.go`): For INSERT/UPDATE/DELETE with RETURNING, uses `ColumnUsage` entries with `UsageType == "returning"` to resolve struct fields.
+
+4. **PG to Go type mapping** (`pgTypeToGoType` in `generator.go`):
    - `bigserial`, `bigint`, `int8` -> `int64`
    - `serial`, `integer`, `int`, `int4` -> `int32`
    - `smallserial`, `smallint`, `int2` -> `int16`
    - `boolean`, `bool` -> `bool`
    - `real`, `float4` -> `float32`
    - `double precision`, `float8` -> `float64`
-   - `text`, `varchar`, `character varying`, `char`, `character`, `uuid` -> `string`
+   - `text`, `varchar`, `character varying`, `char`, `character` -> `string` (nullable: `pgtype.Text`)
+   - `uuid` -> `string` (nullable: `pgtype.UUID`)
    - Anything else defaults to `string`
+
+### Multi-table / JOIN support
+
+Queries can reference multiple tables via JOINs. Table aliases are resolved throughout the pipeline. Outer join nullability is handled automatically:
+
+- `LEFT JOIN` → joined table's columns forced nullable
+- `RIGHT JOIN` → base table's columns forced nullable
+- `FULL JOIN` → both sides forced nullable
+- `JOIN` / `INNER JOIN` / `CROSS JOIN` → use schema nullability as-is
+
+### Validation
+
+- `SELECT *` and `table.*` are rejected with an error — columns must be explicitly listed
+- String literals in SELECT (e.g. `'foo'`) resolve to `string`
 
 ### What is NOT yet implemented
 
-- Query types `:many`, `:exec`, `:execresult`
-- INSERT / UPDATE / DELETE code generation (switch cases exist but are empty)
-- Multi-table / JOIN queries (currently errors on `len(tables) != 1`)
-- Nullable column handling (nullable columns should map to pointer types or `sql.Null*`)
-- `go/format` on generated output (code is in `run.go` but commented out)
+- Error on duplicate query names within a file
+- Params struct for 3+ parameters (like sqlc generates)
 
 ### Internal utility packages
 
@@ -98,9 +122,11 @@ The generator produces:
 
 ### Key dependencies
 
-- `github.com/valkdb/postgresparser` — SQL parser. Key types: `ParsedQuery` (with `Columns`, `Tables`, `ColumnUsage`, `Parameters`, `DDLActions`), `DDLColumn` (with `Name`, `Type`, `Nullable`), `SelectColumn` (with `Expression`, `Alias`), `ColumnUsage` (with `TableAlias`, `Column`, `UsageType`), `Parameter` (with `Position`)
-- `github.com/bobTheBuilder7/gen` — Go code generation. Key functions: `NewFile()`, `AddBlock()`, `Struct()`, `Const()`, `MethodFunc()`, `Call()`, `ErrCheck()`, `Line()`, `Arg()`, `Import()`, `Field{Name, Type, Tag}`, `WriteTo()`
+- `github.com/valkdb/postgresparser` — SQL parser. Key types: `ParsedQuery` (with `Columns`, `Tables`, `ColumnUsage`, `Parameters`, `DDLActions`, `InsertColumns`, `Returning`, `Command`), `DDLColumn` (with `Name`, `Type`, `Nullable`), `SelectColumn` (with `Expression`, `Alias`), `ColumnUsage` (with `TableAlias`, `Column`, `UsageType`), `TableRef` (with `Name`, `Alias`, `JoinType`), `Parameter` (with `Position`). `ColumnUsageType` constants: `ColumnUsageTypeFilter`, `ColumnUsageTypeDMLSet`, `ColumnUsageTypeReturning`.
+- `github.com/bobTheBuilder7/gen` — Go code generation. Key functions: `NewFile()`, `AddBlock()`, `Struct()`, `Const()`, `MethodFunc()`, `Call()`, `Line()`, `Arg()`, `Import()`, `String()`, `Field{Name, Type, Tag}`, `WriteTo()`
 - `github.com/jackc/pgx/v5` — PostgreSQL driver used in generated code
+- `github.com/jackc/pgx/v5/pgtype` — Nullable Go types: `pgtype.Int2`, `Int4`, `Int8`, `Bool`, `Float4`, `Float8`, `Text`, `UUID`
+- `github.com/jackc/pgx/v5/pgconn` — `pgconn.CommandTag` used by `:execresult` return type
 
 ### Directory conventions
 

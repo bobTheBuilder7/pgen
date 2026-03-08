@@ -417,3 +417,97 @@ func TestResolveParams_LeftJoinParamFromJoinedTable(t *testing.T) {
 	// published is NOT NULL in schema but LEFT JOIN makes posts columns nullable
 	assert.Equal(t, types, []string{"int64", "pgtype.Bool"})
 }
+
+// Subquery param tests
+
+func TestResolveParams_ExistsSubqueryParamOnOuterQuery(t *testing.T) {
+	// EXISTS subquery with param on the outer WHERE clause — resolves correctly
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE EXISTS (SELECT 1 FROM posts WHERE posts.user_id = users.id) AND users.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"id"})
+	assert.Equal(t, types, []string{"int64"})
+}
+
+func TestResolveParams_WhereInSubqueryParam(t *testing.T) {
+	// WHERE IN subquery: $1 is inside the subquery (posts.title = $1)
+	// Should resolve to posts.name (string), not the outer users.id (int64)
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE users.id IN (SELECT posts.user_id FROM posts WHERE posts.title = $1);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"title"})
+	assert.Equal(t, types, []string{"string"})
+}
+
+func TestResolveParams_NotInSubqueryParam(t *testing.T) {
+	// NOT IN subquery: $1 is inside the subquery (posts.published = $1)
+	// Should resolve to posts.published (bool), not users.id (int64)
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE users.id NOT IN (SELECT posts.user_id FROM posts WHERE posts.published = $1);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"published"})
+	assert.Equal(t, types, []string{"bool"})
+}
+
+func TestResolveParams_MixedOuterAndSubqueryParams(t *testing.T) {
+	// $1 is on outer WHERE (users.name), $2 is in subquery (posts.name)
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE users.name = $1 AND users.id IN (SELECT posts.user_id FROM posts WHERE posts.title = $2);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "title"})
+	assert.Equal(t, types, []string{"string", "string"})
+}
+
+func TestResolveParams_SubqueryParamWithNullableColumn(t *testing.T) {
+	// $1 is inside subquery referencing a nullable column (posts.body)
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id FROM users WHERE users.id IN (SELECT posts.user_id FROM posts WHERE posts.body = $1);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"body"})
+	assert.Equal(t, types, []string{"pgtype.Text"})
+}
+
+func TestResolveParams_SubqueryParamAndOuterParamReversed(t *testing.T) {
+	// $1 is in subquery (posts.name), $2 is on outer WHERE (users.name)
+	c := testCliWithUsersAndPostsSchema(t)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE users.id IN (SELECT posts.user_id FROM posts WHERE posts.title = $1) AND users.name = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"title", "name"})
+	assert.Equal(t, types, []string{"string", "string"})
+}

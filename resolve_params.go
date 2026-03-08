@@ -2,79 +2,179 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/valkdb/postgresparser"
 )
+
+// subqueryParamInfo holds the resolved column usage and tables for a parameter
+// that belongs to a subquery rather than the top-level query.
+type subqueryParamInfo struct {
+	usage  postgresparser.ColumnUsage
+	tables []postgresparser.TableRef
+}
+
+// buildSubqueryParamMap scans subqueries for $N references and returns a map
+// of parameter position → subquery column usage info.
+// Each subquery's filter-type ColumnUsage entries have a Context field (e.g.
+// "posts.name = $1") that tells us which $N belongs to which subquery filter.
+func buildSubqueryParamMap(subqueries []postgresparser.SubqueryRef) map[int]subqueryParamInfo {
+	result := make(map[int]subqueryParamInfo)
+
+	for _, sq := range subqueries {
+		if sq.Query == nil {
+			continue
+		}
+		filters := filterColumns(sq.Query.ColumnUsage, postgresparser.ColumnUsageTypeFilter)
+		for _, filter := range filters {
+			// Check if this filter's Context contains a $N reference
+			paramPos := extractParamPosition(filter.Context)
+			if paramPos > 0 {
+				result[paramPos] = subqueryParamInfo{
+					usage:  filter,
+					tables: sq.Query.Tables,
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// extractParamPosition extracts the parameter position from a Context string
+// like "posts.name = $1". Returns 0 if no parameter reference found.
+func extractParamPosition(context string) int {
+	idx := strings.Index(context, "$")
+	if idx < 0 {
+		return 0
+	}
+	var pos int
+	for i := idx + 1; i < len(context); i++ {
+		if context[i] >= '0' && context[i] <= '9' {
+			pos = pos*10 + int(context[i]-'0')
+		} else {
+			break
+		}
+	}
+	return pos
+}
 
 // resolveParams builds the function parameter list from parsed columns and parameters.
 // Returns param names and their Go types, ordered by parameter position ($1, $2, ...).
 // For SELECT/DELETE, parameters match filter (WHERE) columns.
 // For UPDATE, parameters match dml_set (SET) columns first, then filter (WHERE) columns.
+// Parameters inside subqueries are resolved using the subquery's column usage and tables.
 func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []string, error) {
-	var usages []postgresparser.ColumnUsage
-
 	// For INSERT, parameters map directly to InsertColumns by position.
-	// For UPDATE, SET columns come first, then WHERE filter columns.
-	// For SELECT/DELETE, parameters match WHERE filter columns.
 	if parsedSQL.Command == postgresparser.QueryCommandInsert {
 		return c.resolveInsertParams(parsedSQL)
 	}
 
+	// Build subquery param map to identify params that belong to subqueries
+	subqMap := buildSubqueryParamMap(parsedSQL.Subqueries)
+
+	// Build top-level usages, filtering out "phantom" filter entries
+	// that correspond to IN/NOT IN subquery clauses.
+	// A phantom filter's Context contains a subquery (starts with "SELECT" after the IN keyword).
+	var usages []postgresparser.ColumnUsage
 	switch parsedSQL.Command {
 	case postgresparser.QueryCommandUpdate:
 		usages = append(usages, filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeDMLSet)...)
-		usages = append(usages, filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeFilter)...)
+		for _, cu := range filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeFilter) {
+			if !isPhantomSubqueryFilter(cu) {
+				usages = append(usages, cu)
+			}
+		}
 	default:
-		usages = filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeFilter)
+		for _, cu := range filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeFilter) {
+			if !isPhantomSubqueryFilter(cu) {
+				usages = append(usages, cu)
+			}
+		}
 	}
 
 	var names []string
 	var types []string
 
+	// Track position in top-level usages separately since subquery params
+	// are resolved from the subquery, not from top-level usages.
+	usageIdx := 0
+
 	for _, param := range parsedSQL.Parameters {
-		if param.Position-1 >= len(usages) {
+		// Check if this param belongs to a subquery
+		if sqInfo, ok := subqMap[param.Position]; ok {
+			name, goType, err := c.resolveParamFromUsage(sqInfo.usage, sqInfo.tables)
+			if err != nil {
+				return nil, nil, fmt.Errorf("subquery parameter $%d: %w", param.Position, err)
+			}
+			names = append(names, name)
+			types = append(types, goType)
+			continue
+		}
+
+		// Top-level param
+		if usageIdx >= len(usages) {
 			return nil, nil, fmt.Errorf("parameter $%d has no matching column usage", param.Position)
 		}
-		usage := usages[param.Position-1]
+		usage := usages[usageIdx]
+		usageIdx++
 
-		colName := usage.Column
-		tableAlias := usage.TableAlias
-
-		// Resolve table name from alias
-		var tableName string
-		for _, t := range parsedSQL.Tables {
-			if t.Alias == tableAlias || t.Name == tableAlias {
-				tableName = t.Name
-				break
-			}
+		name, goType, err := c.resolveParamFromUsage(usage, parsedSQL.Tables)
+		if err != nil {
+			return nil, nil, err
 		}
-
-		if tableName == "" {
-			return nil, nil, fmt.Errorf("could not resolve table for alias %s", tableAlias)
-		}
-
-		ddlColumns, ok := c.tablesCol.Load(tableName)
-		if !ok {
-			return nil, nil, fmt.Errorf("table %s not found in schema", tableName)
-		}
-
-		var goType string
-		for _, ddlCol := range ddlColumns {
-			if ddlCol.Name == colName {
-				nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, parsedSQL.Tables)
-				goType = pgTypeToGoType(ddlCol.Type, nullable)
-				break
-			}
-		}
-		if goType == "" {
-			return nil, nil, fmt.Errorf("column %s not found in table %s", colName, tableName)
-		}
-
-		names = append(names, colName)
+		names = append(names, name)
 		types = append(types, goType)
 	}
 
 	return names, types, nil
+}
+
+// isPhantomSubqueryFilter returns true if a filter ColumnUsage entry is a
+// "phantom" entry generated by the parser for an IN/NOT IN subquery clause.
+// These entries have a Context like "users.id IN (SELECT ...)" and should be
+// skipped since the real param resolution happens via the subquery's ColumnUsage.
+func isPhantomSubqueryFilter(cu postgresparser.ColumnUsage) bool {
+	return strings.Contains(cu.Context, " IN (SELECT ") || strings.Contains(cu.Context, " IN(SELECT ")
+}
+
+// resolveParamFromUsage resolves a single parameter's name and Go type from
+// a ColumnUsage entry and the relevant table list.
+func (c *cli) resolveParamFromUsage(usage postgresparser.ColumnUsage, tables []postgresparser.TableRef) (string, string, error) {
+	colName := usage.Column
+	tableAlias := usage.TableAlias
+
+	// Resolve table name from alias
+	var tableName string
+	for _, t := range tables {
+		if t.Alias == tableAlias || t.Name == tableAlias {
+			tableName = t.Name
+			break
+		}
+	}
+
+	if tableName == "" {
+		return "", "", fmt.Errorf("could not resolve table for alias %s", tableAlias)
+	}
+
+	ddlColumns, ok := c.tablesCol.Load(tableName)
+	if !ok {
+		return "", "", fmt.Errorf("table %s not found in schema", tableName)
+	}
+
+	var goType string
+	for _, ddlCol := range ddlColumns {
+		if ddlCol.Name == colName {
+			nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, tables)
+			goType = pgTypeToGoType(ddlCol.Type, nullable)
+			break
+		}
+	}
+	if goType == "" {
+		return "", "", fmt.Errorf("column %s not found in table %s", colName, tableName)
+	}
+
+	return colName, goType, nil
 }
 
 // resolveInsertParams resolves parameter names and Go types for INSERT statements.

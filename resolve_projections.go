@@ -27,16 +27,16 @@ func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables [
 			return nil, nil, err
 		}
 
-		fieldName := col.Alias
-		if fieldName == "" {
-			fieldName = col.Expression
-			if dotIdx := strings.LastIndex(fieldName, "."); dotIdx != -1 {
-				fieldName = fieldName[dotIdx+1:]
+		jsonName := col.Alias
+		if jsonName == "" {
+			jsonName = col.Expression
+			if dotIdx := strings.LastIndex(jsonName, "."); dotIdx != -1 {
+				jsonName = jsonName[dotIdx+1:]
 			}
 		}
-		fieldName = utils.ToPascalCase(fieldName)
+		fieldName := utils.ToPascalCase(jsonName)
 
-		structFields = append(structFields, gen.Field{Name: fieldName, Type: goType})
+		structFields = append(structFields, gen.Field{Name: fieldName, Type: goType, Tag: `json:"` + jsonName + `"`})
 		scanFields = append(scanFields, "&i."+fieldName)
 	}
 
@@ -161,7 +161,7 @@ func (c *cli) resolveReturning(parsedSQL *postgresparser.ParsedQuery) ([]gen.Fie
 		}
 
 		fieldName := utils.ToPascalCase(col.Column)
-		structFields = append(structFields, gen.Field{Name: fieldName, Type: goType})
+		structFields = append(structFields, gen.Field{Name: fieldName, Type: goType, Tag: `json:"` + col.Column + `"`})
 		scanFields = append(scanFields, "&i."+fieldName)
 	}
 
