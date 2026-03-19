@@ -511,3 +511,367 @@ func TestResolveParams_SubqueryParamAndOuterParamReversed(t *testing.T) {
 	assert.Equal(t, names, []string{"title", "name"})
 	assert.Equal(t, types, []string{"string", "string"})
 }
+
+// Named parameter tests — convertNamedParams
+
+func TestConvertNamedParams_NoParams(t *testing.T) {
+	sql := `SELECT users.id FROM users;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, sql)
+	assert.Nil(t, names)
+}
+
+func TestConvertNamedParams_PositionalOnly(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.id = $1;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, sql)
+	assert.Nil(t, names)
+}
+
+func TestConvertNamedParams_SingleNamed(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.id = @id;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `SELECT users.id FROM users WHERE users.id = $1;`)
+	assert.Equal(t, names, []string{"id"})
+}
+
+func TestConvertNamedParams_MultipleNamed(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.id = @id AND users.name = @name;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `SELECT users.id FROM users WHERE users.id = $1 AND users.name = $2;`)
+	assert.Equal(t, names, []string{"id", "name"})
+}
+
+func TestConvertNamedParams_Underscore(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.role_id = @role_id;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `SELECT users.id FROM users WHERE users.role_id = $1;`)
+	assert.Equal(t, names, []string{"role_id"})
+}
+
+func TestConvertNamedParams_MixedError(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.id = $1 AND users.name = @name;`
+	_, _, err := convertNamedParams(sql)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `cannot mix`)
+}
+
+func TestConvertNamedParams_InsertNamed(t *testing.T) {
+	sql := `INSERT INTO users (name, email, age) VALUES (@name, @email, @age);`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `INSERT INTO users (name, email, age) VALUES ($1, $2, $3);`)
+	assert.Equal(t, names, []string{"name", "email", "age"})
+}
+
+func TestConvertNamedParams_UpdateNamed(t *testing.T) {
+	sql := `UPDATE users SET name = @name WHERE users.id = @id;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `UPDATE users SET name = $1 WHERE users.id = $2;`)
+	assert.Equal(t, names, []string{"name", "id"})
+}
+
+func TestConvertNamedParams_DeleteNamed(t *testing.T) {
+	sql := `DELETE FROM users WHERE users.id = @id;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `DELETE FROM users WHERE users.id = $1;`)
+	assert.Equal(t, names, []string{"id"})
+}
+
+func TestConvertNamedParams_ThreeParams(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.role_id = @role_id AND users.name = @user_name AND users.active = @is_active;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `SELECT users.id FROM users WHERE users.role_id = $1 AND users.name = $2 AND users.active = $3;`)
+	assert.Equal(t, names, []string{"role_id", "user_name", "is_active"})
+}
+
+func TestConvertNamedParams_ReturningNamed(t *testing.T) {
+	sql := `INSERT INTO users (name, email) VALUES (@name, @email) RETURNING id, name;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name;`)
+	assert.Equal(t, names, []string{"name", "email"})
+}
+
+// End-to-end named param tests — convertNamedParams + ParseSQLStrict + resolveParams
+
+func TestNamedParams_SelectSingleParam(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `SELECT users.id, users.name FROM users WHERE users.id = @user_id;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	// resolveParams returns column-derived names, override with named params
+	assert.Equal(t, names, []string{"id"})
+	assert.Equal(t, types, []string{"int64"})
+	// namedParams has the user-specified names
+	assert.Equal(t, namedParams, []string{"user_id"})
+}
+
+func TestNamedParams_SelectMultipleParams(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `SELECT users.id FROM users WHERE users.id = @user_id AND users.name = @user_name;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"int64", "string"})
+	assert.Equal(t, namedParams, []string{"user_id", "user_name"})
+}
+
+func TestNamedParams_SelectWithAliasedTable(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `SELECT u.id, u.email FROM users u WHERE u.referrer_id = @ref_id;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"pgtype.Int8"})
+	assert.Equal(t, namedParams, []string{"ref_id"})
+}
+
+func TestNamedParams_SelectNullableColumn(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `SELECT users.id FROM users WHERE users.active = @is_active AND users.age = @min_age;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"pgtype.Bool", "pgtype.Int2"})
+	assert.Equal(t, namedParams, []string{"is_active", "min_age"})
+}
+
+func TestNamedParams_InsertParams(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `INSERT INTO users (name, email, status) VALUES (@user_name, @user_email, @user_status);`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"string", "string", "int16"})
+	assert.Equal(t, namedParams, []string{"user_name", "user_email", "user_status"})
+}
+
+func TestNamedParams_InsertNullableParams(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `INSERT INTO users (name, email, age, active) VALUES (@name, @email, @age, @active);`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Int2", "pgtype.Bool"})
+	assert.Equal(t, namedParams, []string{"name", "email", "age", "active"})
+}
+
+func TestNamedParams_UpdateSetAndWhere(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `UPDATE users SET name = @new_name WHERE users.id = @user_id;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"string", "int64"})
+	assert.Equal(t, namedParams, []string{"new_name", "user_id"})
+}
+
+func TestNamedParams_UpdateMultipleSets(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `UPDATE users SET name = @new_name, email = @new_email, active = @is_active WHERE users.id = @user_id;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Bool", "int64"})
+	assert.Equal(t, namedParams, []string{"new_name", "new_email", "is_active", "user_id"})
+}
+
+func TestNamedParams_DeleteSingleParam(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `DELETE FROM users WHERE users.id = @user_id;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"int64"})
+	assert.Equal(t, namedParams, []string{"user_id"})
+}
+
+func TestNamedParams_DeleteMultipleParams(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `DELETE FROM users WHERE users.id = @user_id AND users.name = @user_name;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"int64", "string"})
+	assert.Equal(t, namedParams, []string{"user_id", "user_name"})
+}
+
+func TestNamedParams_AllIntSizes(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `SELECT users.email FROM users WHERE users.id = @big AND users.status = @small AND users.role_id = @medium AND users.verified = @flag;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"int64", "int16", "int32", "bool"})
+	assert.Equal(t, namedParams, []string{"big", "small", "medium", "flag"})
+}
+
+func TestNamedParams_JoinParams(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	sql := `SELECT u.id, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = @user_id AND p.title = @post_title;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"int64", "string"})
+	assert.Equal(t, namedParams, []string{"user_id", "post_title"})
+}
+
+func TestNamedParams_LeftJoinForcesNullable(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	sql := `SELECT u.id, p.title FROM users u LEFT JOIN posts p ON u.id = p.user_id WHERE u.id = @user_id AND p.published = @is_published;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"int64", "pgtype.Bool"})
+	assert.Equal(t, namedParams, []string{"user_id", "is_published"})
+}
+
+func TestNamedParams_InsertWithReturning(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+
+	sql := `INSERT INTO users (name, email) VALUES (@user_name, @user_email) RETURNING id, name;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"string", "string"})
+	assert.Equal(t, namedParams, []string{"user_name", "user_email"})
+}
+
+func TestNamedParams_SubqueryParam(t *testing.T) {
+	c := testCliWithUsersAndPostsSchema(t)
+
+	sql := `SELECT users.id, users.name FROM users WHERE users.id IN (SELECT posts.user_id FROM posts WHERE posts.title = @post_title);`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+
+	parsedSQL, err := postgresparser.ParseSQLStrict(converted)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, types, err := c.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, types, []string{"string"})
+	assert.Equal(t, namedParams, []string{"post_title"})
+}

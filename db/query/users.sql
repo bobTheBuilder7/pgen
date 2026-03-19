@@ -31,3 +31,6 @@ INSERT INTO users (name, age) VALUES ($1, $2) RETURNING id, name;
 
 -- name: GetUserPosts :many
 SELECT u.id, u.name, p.id as post_id, p.name as post_name FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;
+
+-- name: GetUserByName :one
+SELECT users.id, users.name FROM users WHERE users.id = @user_id AND users.name = @user_name;

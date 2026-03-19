@@ -40,7 +40,9 @@ CREATE TABLE users (
 
 ### 2. Write your queries
 
-Annotate each query with `-- name: FunctionName :queryType`:
+Annotate each query with `-- name: FunctionName :queryType`.
+
+You can use **positional parameters** (`$1`, `$2`) or **named parameters** (`@name`, `@user_id`):
 
 ```sql
 -- db/query/users.sql
@@ -49,6 +51,11 @@ Annotate each query with `-- name: FunctionName :queryType`:
 SELECT users.id, users.name
 FROM users
 WHERE users.id = $1 AND users.name = $2;
+
+-- name: GetUserByName :one
+SELECT users.id, users.name
+FROM users
+WHERE users.id = @user_id AND users.name = @user_name;
 
 -- name: ListUsers :many
 SELECT users.id, users.name FROM users;
@@ -130,8 +137,8 @@ For a `:one` SELECT query, pgen generates a result struct, a SQL constant, and a
 
 ```go
 type GetUserByIDRow struct {
-    Id   int64
-    Name string
+    Id   int64  `json:"id"`
+    Name string `json:"name"`
 }
 
 const GetUserByIDSQL = "SELECT users.id, users.name FROM users WHERE users.id = $1 and users.name = $2;"
@@ -143,6 +150,20 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64, name string) (GetUs
     return i, err
 }
 ```
+
+When using named parameters, the `@name` values become the function parameter names:
+
+```go
+// Query: WHERE users.id = @user_id AND users.name = @user_name
+
+const GetUserByNameSQL = "SELECT users.id, users.name FROM users WHERE users.id = $1 AND users.name = $2;"
+
+func (q *Queries) GetUserByName(ctx context.Context, user_id int64, user_name string) (GetUserByNameRow, error) {
+    // ...
+}
+```
+
+Named parameters are converted to positional `$N` in the SQL constant (pgx requires positional params), but your function signature uses the readable names you chose.
 
 For `:many`, it returns a slice and iterates over `rows`:
 
@@ -176,12 +197,46 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 
 ## Features
 
+- **Named parameters** — Use `@name` style params for readable function signatures, or `$N` positional params
+- **JSON tags** — Generated structs include `json:"snake_case"` tags
 - **JOINs** — Multi-table queries with aliases are fully supported
 - **RETURNING** — INSERT/UPDATE/DELETE with RETURNING clauses generate row structs
+- **Subqueries** — WHERE IN, EXISTS, and scalar subqueries are supported
 - **Nullable columns** — Nullable columns map to pgx types (`pgtype.Int4`, `pgtype.Text`, etc.) instead of raw Go types
 - **All DML** — SELECT, INSERT, UPDATE, and DELETE are all supported
 - **Concurrent parsing** — Schema and query files are parsed in parallel using errgroups
 - **pgx/v5 native** — Generated code uses pgx directly, no `database/sql` wrapper
+
+## Named parameters
+
+Instead of positional `$1, $2, $3`, you can use `@name` style parameters for more readable queries and generated code:
+
+```sql
+-- Positional: parameter names are derived from column names
+-- name: GetUser :one
+SELECT users.id, users.name FROM users WHERE users.id = $1;
+-- generates: func GetUser(ctx context.Context, id int64)
+
+-- Named: you choose the parameter names
+-- name: GetUser :one
+SELECT users.id, users.name FROM users WHERE users.id = @user_id;
+-- generates: func GetUser(ctx context.Context, user_id int64)
+```
+
+Named parameters work with all query types — SELECT, INSERT, UPDATE, DELETE:
+
+```sql
+-- name: CreateUser :exec
+INSERT INTO users (name, age) VALUES (@name, @age);
+
+-- name: UpdateUserName :exec
+UPDATE users SET name = @new_name WHERE users.id = @user_id;
+
+-- name: DeleteUser :exec
+DELETE FROM users WHERE users.id = @user_id;
+```
+
+**Note:** You cannot mix `@name` and `$N` in the same query — pick one style per query.
 
 ## Type mapping
 

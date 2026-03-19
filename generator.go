@@ -4,11 +4,41 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/bobTheBuilder7/gen"
 	"github.com/valkdb/postgresparser"
 )
+
+var namedParamRegex = regexp.MustCompile(`@(\w+)`)
+var positionalParamRegex = regexp.MustCompile(`\$\d+`)
+
+// convertNamedParams detects @name style parameters in SQL and converts them
+// to positional $N parameters. Returns the converted SQL and the ordered list
+// of parameter names. If no named params are found, returns the original SQL
+// with nil paramNames. Errors if both @name and $N styles are mixed.
+func convertNamedParams(sql string) (string, []string, error) {
+	hasNamed := namedParamRegex.MatchString(sql)
+	hasPositional := positionalParamRegex.MatchString(sql)
+
+	if hasNamed && hasPositional {
+		return "", nil, fmt.Errorf("cannot mix named (@name) and positional ($N) parameters in the same query")
+	}
+
+	if !hasNamed {
+		return sql, nil, nil
+	}
+
+	var paramNames []string
+	converted := namedParamRegex.ReplaceAllStringFunc(sql, func(match string) string {
+		name := match[1:] // strip @
+		paramNames = append(paramNames, name)
+		return fmt.Sprintf("$%d", len(paramNames))
+	})
+
+	return converted, paramNames, nil
+}
 
 func pgTypeToGoType(pgType string, nullable bool) string {
 	switch strings.ToLower(pgType) {
@@ -65,7 +95,15 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 
 	for _, query := range queries {
-		parsedSQL, err := postgresparser.ParseSQLStrict(query.sql)
+		// Convert @name params to $N if present
+		sqlForParsing, namedParams, err := convertNamedParams(query.sql)
+		if err != nil {
+			return err
+		}
+		// Use converted SQL for both parsing and the generated const (pgx needs $N)
+		sqlForConst := sqlForParsing
+
+		parsedSQL, err := postgresparser.ParseSQLStrict(sqlForParsing)
 		if err != nil {
 			return err
 		}
@@ -85,6 +123,11 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 				return err
 			}
 
+			// Override param names if using named params
+			if namedParams != nil {
+				paramNames = namedParams
+			}
+
 			// Build function signature params
 			funcParams := "ctx context.Context"
 			var callArgs []fmt.Stringer
@@ -98,7 +141,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			generatedFile.AddBlock(gen.Struct(rowStructName, structFields...))
 
 			// Generate SQL const
-			generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(query.sql)))
+			generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(sqlForConst)))
 
 			switch query.t {
 			case "one":
@@ -133,21 +176,21 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 					gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
 				)
 			case "exec", "execresult":
-				return c.generateExec(generatedFile, query, parsedSQL)
+				return c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams)
 			default:
 				return fmt.Errorf("query type %s not supported for SELECT", query.t)
 			}
 
 		case postgresparser.QueryCommandInsert:
-			if err := c.generateExec(generatedFile, query, parsedSQL); err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams); err != nil {
 				return err
 			}
 		case postgresparser.QueryCommandUpdate:
-			if err := c.generateExec(generatedFile, query, parsedSQL); err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams); err != nil {
 				return err
 			}
 		case postgresparser.QueryCommandDelete:
-			if err := c.generateExec(generatedFile, query, parsedSQL); err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams); err != nil {
 				return err
 			}
 		default:
@@ -163,7 +206,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	return nil
 }
 
-func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *postgresparser.ParsedQuery) error {
+func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *postgresparser.ParsedQuery, sqlForConst string, namedParams []string) error {
 	hasReturning := len(parsedSQL.Returning) > 0
 
 	if !hasReturning && query.t != "exec" && query.t != "execresult" {
@@ -178,6 +221,11 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 		return err
 	}
 
+	// Override param names if using named params
+	if namedParams != nil {
+		paramNames = namedParams
+	}
+
 	funcParams := "ctx context.Context"
 	var callArgs []fmt.Stringer
 	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+sqlConstSuffix))
@@ -186,7 +234,7 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 		callArgs = append(callArgs, gen.Arg(name))
 	}
 
-	generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(query.sql)))
+	generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(sqlForConst)))
 
 	if hasReturning {
 		structFields, scanFields, err := c.resolveReturning(parsedSQL)

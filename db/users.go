@@ -8,8 +8,8 @@ import (
 )
 
 type GetUserByIDRow struct {
-	Id   int64
-	Name string
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 const GetUserByIDSQL = "SELECT users.id, users.name FROM users WHERE users.id = $1 and users.name = $2;"
@@ -43,8 +43,8 @@ func (q *Queries) CreateUser(ctx context.Context, name string, age pgtype.Int4) 
 }
 
 type ListUsersRow struct {
-	Id   int64
-	Name string
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 const ListUsersSQL = "SELECT users.id, users.name FROM users;"
@@ -87,8 +87,8 @@ func (q *Queries) InsertUser(ctx context.Context, name string, age pgtype.Int4) 
 const InsertUserReturningSQL = "INSERT INTO users (name, age) VALUES ($1, $2) RETURNING id, name;"
 
 type InsertUserReturningRow struct {
-	Id   int64
-	Name string
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 func (q *Queries) InsertUserReturning(ctx context.Context, name string, age pgtype.Int4) (InsertUserReturningRow, error) {
@@ -99,10 +99,10 @@ func (q *Queries) InsertUserReturning(ctx context.Context, name string, age pgty
 }
 
 type GetUserPostsRow struct {
-	Id       int64
-	Name     string
-	PostId   int64
-	PostName string
+	Id       int64  `json:"id"`
+	Name     string `json:"name"`
+	PostId   int64  `json:"post_id"`
+	PostName string `json:"post_name"`
 }
 
 const GetUserPostsSQL = "SELECT u.id, u.name, p.id as post_id, p.name as post_name FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;"
@@ -122,4 +122,18 @@ func (q *Queries) GetUserPosts(ctx context.Context, id int64) ([]GetUserPostsRow
 		items = append(items, i)
 	}
 	return items, rows.Err()
+}
+
+type GetUserByNameRow struct {
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+const GetUserByNameSQL = "SELECT users.id, users.name FROM users WHERE users.id = $1 AND users.name = $2;"
+
+func (q *Queries) GetUserByName(ctx context.Context, user_id int64, user_name string) (GetUserByNameRow, error) {
+	row := q.db.QueryRow(ctx, GetUserByNameSQL, user_id, user_name)
+	var i GetUserByNameRow
+	err := row.Scan(&i.Id, &i.Name)
+	return i, err
 }
