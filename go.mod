@@ -3,10 +3,9 @@ module github.com/bobTheBuilder7/pgen
 go 1.26.0
 
 require (
-	github.com/bobTheBuilder7/gen v0.0.3
+	github.com/bobTheBuilder7/gen v0.0.4
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/valkdb/postgresparser v1.1.7
-	golang.org/x/sync v0.19.0
 )
 
 require (

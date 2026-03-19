@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
-	"golang.org/x/sync/errgroup"
+	"github.com/bobTheBuilder7/pgen/errgroup"
 )
 
 func run(ctx context.Context) error {
