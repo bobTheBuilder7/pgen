@@ -527,10 +527,10 @@ func TestResolveProjections_LeftJoinForcesNullableOnJoinedTable(t *testing.T) {
 	fields, scans, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64", Tag: `json:"id"`},              // users.id — NOT NULL, base table
-		{Name: "Name", Type: "string", Tag: `json:"name"`},          // users.name — NOT NULL, base table
-		{Name: "PostId", Type: "pgtype.Int8", Tag: `json:"post_id"`}, // posts.id — NOT NULL in schema but LEFT JOIN makes it nullable
-		{Name: "Title", Type: "pgtype.Text", Tag: `json:"title"`},    // posts.title — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},                     // users.id — NOT NULL, base table
+		{Name: "Name", Type: "string", Tag: `json:"name"`},                // users.name — NOT NULL, base table
+		{Name: "PostId", Type: "pgtype.Int8", Tag: `json:"post_id"`},      // posts.id — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Title", Type: "pgtype.Text", Tag: `json:"title"`},         // posts.title — NOT NULL in schema but LEFT JOIN makes it nullable
 		{Name: "Published", Type: "pgtype.Bool", Tag: `json:"published"`}, // posts.published — NOT NULL but LEFT JOIN makes it nullable
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title", "&i.Published"})
@@ -566,7 +566,7 @@ func TestResolveProjections_InnerJoinDoesNotForceNullable(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "Title", Type: "string", Tag: `json:"title"`},     // NOT NULL, INNER JOIN doesn't force nullable
+		{Name: "Title", Type: "string", Tag: `json:"title"`},       // NOT NULL, INNER JOIN doesn't force nullable
 		{Name: "Published", Type: "bool", Tag: `json:"published"`}, // NOT NULL, INNER JOIN doesn't force nullable
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Title", "&i.Published"})
@@ -585,7 +585,7 @@ func TestResolveProjections_RightJoinForcesNullableOnBaseTable(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "pgtype.Int8", Tag: `json:"id"`},     // users.id — NOT NULL but RIGHT JOIN makes base table nullable
 		{Name: "Name", Type: "pgtype.Text", Tag: `json:"name"`}, // users.name — NOT NULL but RIGHT JOIN makes base table nullable
-		{Name: "Title", Type: "string", Tag: `json:"title"`},     // posts.title — NOT NULL, joined table in RIGHT JOIN keeps types
+		{Name: "Title", Type: "string", Tag: `json:"title"`},    // posts.title — NOT NULL, joined table in RIGHT JOIN keeps types
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Title"})
 }
@@ -604,7 +604,7 @@ func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},           // users.id — NOT NULL
 		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},   // users.age — nullable in schema
-		{Name: "Title", Type: "string", Tag: `json:"title"`},     // posts.title — NOT NULL
+		{Name: "Title", Type: "string", Tag: `json:"title"`},    // posts.title — NOT NULL
 		{Name: "Body", Type: "pgtype.Text", Tag: `json:"body"`}, // posts.body — nullable in schema
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.Title", "&i.Body"})
