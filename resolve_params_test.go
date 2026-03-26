@@ -875,3 +875,87 @@ func TestNamedParams_SubqueryParam(t *testing.T) {
 	assert.Equal(t, types, []string{"string"})
 	assert.Equal(t, namedParams, []string{"post_title"})
 }
+
+// --- Duplicate param tests ---
+
+func TestConvertNamedParams_DuplicateNameMapsToSamePosition(t *testing.T) {
+	// @val used twice → both should map to $1 (same slot)
+	sql := `SELECT users.id FROM users WHERE users.name = @val AND users.email = @val;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `SELECT users.id FROM users WHERE users.name = $1 AND users.email = $1;`)
+	assert.Equal(t, names, []string{"val"})
+}
+
+func TestConvertNamedParams_DuplicateNameInUpdate(t *testing.T) {
+	// @id used in two WHERE conditions → same $2 slot
+	sql := `UPDATE users SET name = @name WHERE users.id = @id AND users.age = @id;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `UPDATE users SET name = $1 WHERE users.id = $2 AND users.age = $2;`)
+	assert.Equal(t, names, []string{"name", "id"})
+}
+
+func TestConvertNamedParams_DuplicateNameInInsert(t *testing.T) {
+	// All distinct names — no dedup expected
+	sql := `INSERT INTO users (name, email) VALUES (@name, @email);`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `INSERT INTO users (name, email) VALUES ($1, $2);`)
+	assert.Equal(t, names, []string{"name", "email"})
+}
+
+func TestConvertNamedParams_ThreeDistinctNames(t *testing.T) {
+	sql := `SELECT users.id FROM users WHERE users.name = @a AND users.email = @b AND users.age = @c;`
+	converted, names, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, converted, `SELECT users.id FROM users WHERE users.name = $1 AND users.email = $2 AND users.age = $3;`)
+	assert.Equal(t, names, []string{"a", "b", "c"})
+}
+
+func TestResolveParams_DuplicatePositionalParam(t *testing.T) {
+	// $1 used for two different columns — should generate only one function param
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users WHERE users.name = $1 AND users.email = $1;`
+	parsed, err := postgresparser.ParseSQLStrict(sql)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name"})
+	assert.Equal(t, types, []string{"string"})
+}
+
+func TestNamedParams_DuplicateNameSelectOneFunctionParam(t *testing.T) {
+	// @val used twice in WHERE → one function param, SQL uses $1 twice
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users WHERE users.name = @val AND users.email = @val;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, namedParams, []string{"val"})
+	parsed, err := postgresparser.ParseSQLStrict(converted)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	// namedParams overrides resolved names
+	names = namedParams
+	assert.Equal(t, names, []string{"val"})
+	assert.Equal(t, types, []string{"string"})
+}
+
+func TestNamedParams_DuplicateNameUpdateOneFunctionParam(t *testing.T) {
+	// @id used twice in WHERE → two $N slots collapse to one function param after dedup
+	c := testCliWithUsersSchema(t)
+	const sql = `UPDATE users SET name = @new_name WHERE users.id = @id AND users.age = @id;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	assert.Equal(t, namedParams, []string{"new_name", "id"})
+	assert.Equal(t, converted, `UPDATE users SET name = $1 WHERE users.id = $2 AND users.age = $2;`)
+	parsed, err := postgresparser.ParseSQLStrict(converted)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	// Override with named param names
+	names = namedParams
+	assert.Equal(t, names, []string{"new_name", "id"})
+	assert.Equal(t, types, []string{"string", "int64"})
+}

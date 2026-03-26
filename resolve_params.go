@@ -96,11 +96,22 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 	var names []string
 	var types []string
 
+	// Deduplicate parameters by position: $1 used twice in a query results in
+	// two parser entries for position 1, but only one function param should be generated.
+	seen := make(map[int]bool)
+	var dedupedParams []postgresparser.Parameter
+	for _, p := range parsedSQL.Parameters {
+		if !seen[p.Position] {
+			seen[p.Position] = true
+			dedupedParams = append(dedupedParams, p)
+		}
+	}
+
 	// Track position in top-level usages separately since subquery params
 	// are resolved from the subquery, not from top-level usages.
 	usageIdx := 0
 
-	for _, param := range parsedSQL.Parameters {
+	for _, param := range dedupedParams {
 		// Check if this param belongs to a subquery
 		if sqInfo, ok := subqMap[param.Position]; ok {
 			name, goType, err := c.resolveParamFromUsage(sqInfo.usage, sqInfo.tables)

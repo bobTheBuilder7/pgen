@@ -30,11 +30,17 @@ func convertNamedParams(sql string) (string, []string, error) {
 		return sql, nil, nil
 	}
 
+	nameToPos := make(map[string]int)
 	var paramNames []string
 	converted := namedParamRegex.ReplaceAllStringFunc(sql, func(match string) string {
 		name := match[1:] // strip @
+		if pos, seen := nameToPos[name]; seen {
+			return fmt.Sprintf("$%d", pos)
+		}
+		pos := len(paramNames) + 1
+		nameToPos[name] = pos
 		paramNames = append(paramNames, name)
-		return fmt.Sprintf("$%d", len(paramNames))
+		return fmt.Sprintf("$%d", pos)
 	})
 
 	return converted, paramNames, nil
