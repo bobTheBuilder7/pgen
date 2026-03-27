@@ -101,6 +101,12 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 
 	for _, query := range queries {
+		switch query.t {
+		case "one", "many", "exec", "execresult":
+		default:
+			return fmt.Errorf("query %q: unknown query type %q, must be one of: one, many, exec, execresult", query.name, query.t)
+		}
+
 		// Convert @name params to $N if present
 		sqlForParsing, namedParams, err := convertNamedParams(query.sql)
 		if err != nil {
