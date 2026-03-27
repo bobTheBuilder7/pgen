@@ -114,6 +114,19 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			return err
 		}
 
+		if parsedSQL.Command == postgresparser.QueryCommandUpdate || parsedSQL.Command == postgresparser.QueryCommandDelete {
+			hasFilter := false
+			for _, cu := range parsedSQL.ColumnUsage {
+				if cu.UsageType == postgresparser.ColumnUsageTypeFilter {
+					hasFilter = true
+					break
+				}
+			}
+			if !hasFilter {
+				return fmt.Errorf("query %q: %s without WHERE clause is not allowed", query.name, parsedSQL.Command)
+			}
+		}
+
 		switch command := parsedSQL.Command; command {
 		case postgresparser.QueryCommandSelect:
 			structFields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
