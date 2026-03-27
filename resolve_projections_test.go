@@ -682,3 +682,342 @@ func TestResolveProjections_FromSubqueryErrors(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `table sub not found`)
 }
+
+// --- Unknown column / table errors ---
+
+func TestResolveProjections_UnknownColumnErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.nonexistent FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `nonexistent`)
+}
+
+func TestResolveProjections_UnknownColumnErrorMentionsTable(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.typo_col FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `users`)
+}
+
+func TestResolveProjections_UnknownTableAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT x.id FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `x\.id`)
+}
+
+func TestResolveProjections_KnownColumnsStillResolveAfterFix(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+	})
+	assert.Equal(t, scanFields, []string{"&i.Id", "&i.Name"})
+}
+
+// --- Aggregation functions: error without alias ---
+
+func TestResolveProjections_CountStarWithoutAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(*) FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+func TestResolveProjections_CountColumnWithoutAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(users.id) FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+func TestResolveProjections_SumWithoutAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.age) FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+// --- COUNT: always int64 ---
+
+func TestResolveProjections_CountStarWithAlias(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(*) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
+	assert.Equal(t, scanFields, []string{"&i.Total"})
+}
+
+func TestResolveProjections_CountColumnWithAlias(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(users.id) AS cnt FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Cnt", Type: "int64", Tag: `json:"cnt"`}})
+	assert.Equal(t, scanFields, []string{"&i.Cnt"})
+}
+
+func TestResolveProjections_CountMixedWithRegularColumn(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.name, COUNT(*) AS user_count FROM users GROUP BY users.name;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "UserCount", Type: "int64", Tag: `json:"user_count"`},
+	})
+	assert.Equal(t, scanFields, []string{"&i.Name", "&i.UserCount"})
+}
+
+// --- SUM: nullable, same base type as column ---
+
+func TestResolveProjections_SumSmallint(t *testing.T) {
+	// age SMALLINT (nullable) → pgtype.Int2
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.age) AS total_age FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "TotalAge", Type: "pgtype.Int2", Tag: `json:"total_age"`}})
+}
+
+func TestResolveProjections_SumInteger(t *testing.T) {
+	// role_id INTEGER NOT NULL → pgtype.Int4 (SUM forces nullable)
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.role_id) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "pgtype.Int4", Tag: `json:"total"`}})
+}
+
+func TestResolveProjections_SumBigint(t *testing.T) {
+	// org_id BIGINT NOT NULL → pgtype.Int8 (SUM forces nullable)
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.org_id) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "pgtype.Int8", Tag: `json:"total"`}})
+}
+
+// --- COALESCE: non-nullable inner type ---
+
+func TestResolveProjections_CoalesceOfSumSmallint(t *testing.T) {
+	// COALESCE(SUM(users.age), 0) → int16 (non-nullable smallint)
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(users.age), 0) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int16", Tag: `json:"total"`}})
+}
+
+func TestResolveProjections_CoalesceOfSumInteger(t *testing.T) {
+	// COALESCE(SUM(users.role_id), 0) → int32
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(users.role_id), 0) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int32", Tag: `json:"total"`}})
+}
+
+func TestResolveProjections_CoalesceOfSumBigint(t *testing.T) {
+	// COALESCE(SUM(users.org_id), 0) → int64
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(users.org_id), 0) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
+}
+
+// --- AVG: always float64 (nullable) ---
+
+func TestResolveProjections_AvgWithoutAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(users.age) FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+func TestResolveProjections_AvgSmallint(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(users.age) AS avg_age FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "AvgAge", Type: "pgtype.Float8", Tag: `json:"avg_age"`}})
+}
+
+func TestResolveProjections_AvgBigint(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(users.org_id) AS avg_org FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "AvgOrg", Type: "pgtype.Float8", Tag: `json:"avg_org"`}})
+}
+
+// --- MIN / MAX: nullable, same base type as column ---
+
+func TestResolveProjections_MinWithoutAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(users.age) FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+func TestResolveProjections_MaxWithoutAliasErrors(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(users.age) FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+func TestResolveProjections_MinSmallint(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(users.age) AS min_age FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "MinAge", Type: "pgtype.Int2", Tag: `json:"min_age"`}})
+}
+
+func TestResolveProjections_MaxSmallint(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(users.age) AS max_age FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "MaxAge", Type: "pgtype.Int2", Tag: `json:"max_age"`}})
+}
+
+func TestResolveProjections_MinInteger(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(users.role_id) AS min_role FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "MinRole", Type: "pgtype.Int4", Tag: `json:"min_role"`}})
+}
+
+func TestResolveProjections_MaxBigint(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(users.org_id) AS max_org FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "MaxOrg", Type: "pgtype.Int8", Tag: `json:"max_org"`}})
+}
+
+func TestResolveProjections_CoalesceOfMin(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(MIN(users.age), 0) AS min_age FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "MinAge", Type: "int16", Tag: `json:"min_age"`}})
+}
+
+func TestResolveProjections_CoalesceOfMax(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(MAX(users.org_id), 0) AS max_org FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "MaxOrg", Type: "int64", Tag: `json:"max_org"`}})
+}
+
+func TestResolveProjections_CoalesceOfCount(t *testing.T) {
+	// COALESCE(COUNT(*), 0) → int64 (COUNT already non-nullable, stays int64)
+	c := testCliWithUsersSchema(t)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(COUNT(*), 0) AS total FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	fields, _, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
+}
