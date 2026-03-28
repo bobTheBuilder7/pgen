@@ -1,7 +1,5 @@
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
-github.com/bobTheBuilder7/gen v0.0.4 h1:0zsWOdRKcxyC9Ed2d9n2xoCVhHEp65g9tzJPvxtVxAA=
-github.com/bobTheBuilder7/gen v0.0.4/go.mod h1:mFOJLXJ2YLhDQ7oh+A3Lh8N4XH0rMU6HBZizz5w7eyg=
 github.com/bobTheBuilder7/gen v0.0.6 h1:9FRehljr6E7M+bBV1AakKQs/VXowXVrBlGbubd65ML4=
 github.com/bobTheBuilder7/gen v0.0.6/go.mod h1:mFOJLXJ2YLhDQ7oh+A3Lh8N4XH0rMU6HBZizz5w7eyg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
