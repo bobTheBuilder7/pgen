@@ -134,6 +134,12 @@ Queries can reference multiple tables via JOINs. Table aliases are resolved thro
 - `db/query/*.sql` — Query files with `-- name:` annotations; each generates a corresponding `db/<name>.go`
 - `db/db.go` — Hand-written, not generated
 
+## Development approach
+
+We follow test-driven development: **write tests first, then implement the functionality**. Before implementing a new feature or fix, write tests that capture the expected behavior (and confirm they fail). Then implement until all tests pass.
+
+When exploring unknown behavior (e.g. how the parser handles a new SQL construct), use `experiments/main.go` to probe the parser directly before writing tests or implementation.
+
 ## Testing
 
 We use our own `assert/` package (`github.com/bobTheBuilder7/pgen/assert`). Available functions:

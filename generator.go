@@ -120,6 +120,18 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			return err
 		}
 
+		// Validate that positional parameters are sequential with no gaps.
+		// PostgreSQL requires $1, $2, $3... — skipping (e.g. $1 and $31) is a runtime error.
+		seen := make(map[int]bool)
+		for _, p := range parsedSQL.Parameters {
+			seen[p.Position] = true
+		}
+		for i := 1; i <= len(seen); i++ {
+			if !seen[i] {
+				return fmt.Errorf("query %q: parameter positions are not sequential (missing $%d)", query.name, i)
+			}
+		}
+
 		if parsedSQL.Command == postgresparser.QueryCommandUpdate || parsedSQL.Command == postgresparser.QueryCommandDelete {
 			hasFilter := false
 			for _, cu := range parsedSQL.ColumnUsage {

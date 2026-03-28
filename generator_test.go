@@ -181,6 +181,36 @@ func TestGenerateCode_WhereWithLimitParamSucceeds(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+// --- Non-sequential parameters ---
+
+func TestGenerateCode_NonSequentialParamsReturnsError(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	// $1 and $31 — missing $2 through $30
+	err := generateQuery(t, c, "GetFirstNUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1 OFFSET $31;`)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `\$2`)
+}
+
+func TestGenerateCode_NonSequentialWhereParamsReturnsError(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "GetUser", "one", `SELECT users.id, users.name FROM users WHERE users.id = $1 AND users.name = $3;`)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `\$2`)
+}
+
+func TestGenerateCode_NonSequentialErrorMentionsQueryName(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "GetFirstNUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1 OFFSET $31;`)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `GetFirstNUsers`)
+}
+
+func TestGenerateCode_SequentialParamsSucceed(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "GetUser", "one", `SELECT users.id, users.name FROM users WHERE users.id = $1 AND users.name = $2;`)
+	assert.Nil(t, err)
+}
+
 func TestGenerateCode_ValidQueryTypesSucceed(t *testing.T) {
 	validTypes := []struct {
 		t   string
