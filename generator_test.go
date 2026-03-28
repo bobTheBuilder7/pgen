@@ -147,6 +147,40 @@ func TestGenerateCode_EmptyQueryTypeReturnsError(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+// --- DISTINCT ---
+
+func TestGenerateCode_DistinctWithoutWhereSucceeds(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "ListUsers", "many", `SELECT DISTINCT users.id, users.name FROM users;`)
+	assert.Nil(t, err)
+}
+
+func TestGenerateCode_DistinctWithWhereSucceeds(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "GetUser", "many", `SELECT DISTINCT users.id, users.name FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+}
+
+// --- LIMIT / OFFSET params ---
+
+func TestGenerateCode_LimitParamSucceeds(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "ListUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1;`)
+	assert.Nil(t, err)
+}
+
+func TestGenerateCode_LimitAndOffsetParamsSucceed(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "ListUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1 OFFSET $2;`)
+	assert.Nil(t, err)
+}
+
+func TestGenerateCode_WhereWithLimitParamSucceeds(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	err := generateQuery(t, c, "ListUsers", "many", `SELECT users.id, users.name FROM users WHERE users.name = $1 LIMIT $2;`)
+	assert.Nil(t, err)
+}
+
 func TestGenerateCode_ValidQueryTypesSucceed(t *testing.T) {
 	validTypes := []struct {
 		t   string

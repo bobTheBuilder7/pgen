@@ -959,3 +959,75 @@ func TestNamedParams_DuplicateNameUpdateOneFunctionParam(t *testing.T) {
 	assert.Equal(t, names, []string{"new_name", "id"})
 	assert.Equal(t, types, []string{"string", "int64"})
 }
+
+// --- LIMIT / OFFSET params ---
+
+func TestResolveParams_LimitOnly(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users LIMIT $1;`
+	parsed, err := postgresparser.ParseSQLStrict(sql)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"limit"})
+	assert.Equal(t, types, []string{"int64"})
+}
+
+func TestResolveParams_LimitAndOffset(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users LIMIT $1 OFFSET $2;`
+	parsed, err := postgresparser.ParseSQLStrict(sql)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"limit", "offset"})
+	assert.Equal(t, types, []string{"int64", "int64"})
+}
+
+func TestResolveParams_WhereAndLimit(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users WHERE users.name = $1 LIMIT $2;`
+	parsed, err := postgresparser.ParseSQLStrict(sql)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "limit"})
+	assert.Equal(t, types, []string{"string", "int64"})
+}
+
+func TestResolveParams_WhereAndLimitAndOffset(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users WHERE users.name = $1 LIMIT $2 OFFSET $3;`
+	parsed, err := postgresparser.ParseSQLStrict(sql)
+	assert.Nil(t, err)
+	names, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "limit", "offset"})
+	assert.Equal(t, types, []string{"string", "int64", "int64"})
+}
+
+func TestResolveParams_NamedLimitParam(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users WHERE users.name = @name LIMIT @lim;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	parsed, err := postgresparser.ParseSQLStrict(converted)
+	assert.Nil(t, err)
+	_, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, namedParams, []string{"name", "lim"})
+	assert.Equal(t, types, []string{"string", "int64"})
+}
+
+func TestResolveParams_NamedLimitAndOffsetParams(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	const sql = `SELECT users.id FROM users LIMIT @lim OFFSET @off;`
+	converted, namedParams, err := convertNamedParams(sql)
+	assert.Nil(t, err)
+	parsed, err := postgresparser.ParseSQLStrict(converted)
+	assert.Nil(t, err)
+	_, types, err := c.resolveParams(parsed)
+	assert.Nil(t, err)
+	assert.Equal(t, namedParams, []string{"lim", "off"})
+	assert.Equal(t, types, []string{"int64", "int64"})
+}

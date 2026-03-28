@@ -111,6 +111,11 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 	// are resolved from the subquery, not from top-level usages.
 	usageIdx := 0
 
+	// limitOffsetNames are assigned to params that have no matching ColumnUsage —
+	// these are LIMIT/OFFSET params. First overflow = limit, second = offset.
+	limitOffsetNames := []string{"limit", "offset"}
+	overflowIdx := 0
+
 	for _, param := range dedupedParams {
 		// Check if this param belongs to a subquery
 		if sqInfo, ok := subqMap[param.Position]; ok {
@@ -124,18 +129,25 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 		}
 
 		// Top-level param
-		if usageIdx >= len(usages) {
+		if usageIdx < len(usages) {
+			usage := usages[usageIdx]
+			usageIdx++
+			name, goType, err := c.resolveParamFromUsage(usage, parsedSQL.Tables)
+			if err != nil {
+				return nil, nil, err
+			}
+			names = append(names, name)
+			types = append(types, goType)
+			continue
+		}
+
+		// No matching ColumnUsage — must be a LIMIT or OFFSET param
+		if overflowIdx >= len(limitOffsetNames) {
 			return nil, nil, fmt.Errorf("parameter $%d has no matching column usage", param.Position)
 		}
-		usage := usages[usageIdx]
-		usageIdx++
-
-		name, goType, err := c.resolveParamFromUsage(usage, parsedSQL.Tables)
-		if err != nil {
-			return nil, nil, err
-		}
-		names = append(names, name)
-		types = append(types, goType)
+		names = append(names, limitOffsetNames[overflowIdx])
+		types = append(types, "int64")
+		overflowIdx++
 	}
 
 	return names, types, nil
