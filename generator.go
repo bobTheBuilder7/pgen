@@ -223,7 +223,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 		}
 	}
 
-	err := generatedFile.WriteTo(output)
+	_, err := generatedFile.WriteTo(output)
 	if err != nil {
 		return err
 	}

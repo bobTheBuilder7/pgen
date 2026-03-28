@@ -3,7 +3,7 @@ module github.com/bobTheBuilder7/pgen
 go 1.26.0
 
 require (
-	github.com/bobTheBuilder7/gen v0.0.4
+	github.com/bobTheBuilder7/gen v0.0.6
 	github.com/valkdb/postgresparser v1.1.7
 )
 

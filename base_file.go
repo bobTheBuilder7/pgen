@@ -32,7 +32,7 @@ func generateBaseFile(w io.Writer) error {
 		gen.Line("return &Queries{db: tx}"),
 	))
 
-	err := f.WriteTo(w)
+	_, err := f.WriteTo(w)
 	if err != nil {
 		return err
 	}
