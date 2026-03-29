@@ -104,7 +104,6 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 	}
 
-
 	for _, query := range queries {
 		switch query.t {
 		case "one", "many", "exec", "execresult":
