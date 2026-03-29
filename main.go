@@ -9,7 +9,7 @@ import (
 
 const dbDirectory = "db"
 const queriesDirectory = "query"
-const schemaDirectory = "schema"
+const schemaDirectory = "migrations"
 const sqlConstSuffix = "SQL"
 
 type cli struct {

@@ -2,48 +2,64 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
 	"github.com/valkdb/postgresparser"
 )
 
-func (c *cli) parseSchema(ctx context.Context, reader io.Reader) error {
+func (c *cli) parseSchema(_ context.Context, reader io.Reader) error {
 	b := bytesbufferpool.Get()
 	defer bytesbufferpool.Put(b)
 
 	b.ReadFrom(reader)
 
-	sql, err := b.ReadString(';')
-	if err != nil {
-		return err
-	}
+	stmts := strings.SplitSeq(b.String(), ";")
+	for stmt := range stmts {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
 
-	parsedSQL, err := postgresparser.ParseSQLStrict(sql)
-	if err != nil {
-		return err
-	}
+		parsed, err := postgresparser.ParseSQLStrict(stmt)
+		if err != nil {
+			// Non-parseable statements (comments, unsupported syntax) are skipped
+			continue
+		}
 
-	if parsedSQL.Command != postgresparser.QueryCommandDDL {
-		return errors.New("has to be create table")
-	}
+		for _, action := range parsed.DDLActions {
+			switch action.Type {
+			case postgresparser.DDLCreateTable:
+				if _, ok := c.tablesCol.Load(action.ObjectName); ok {
+					return fmt.Errorf("table %s defined twice", action.ObjectName)
+				}
+				c.tablesCol.Store(action.ObjectName, action.ColumnDetails)
 
-	if len(parsedSQL.Tables) != 1 {
-		return errors.New("the amout of tables per file is not 1")
+			case postgresparser.DDLDropColumn:
+				cols, ok := c.tablesCol.Load(action.ObjectName)
+				if !ok {
+					return fmt.Errorf("DROP COLUMN on unknown table %s", action.ObjectName)
+				}
+				for _, colName := range action.Columns {
+					cols = removeColumn(cols, colName)
+				}
+				c.tablesCol.Store(action.ObjectName, cols)
+			}
+		}
 	}
-
-	if len(parsedSQL.DDLActions) != 1 {
-		return errors.New("DDLActions is not one")
-	}
-
-	_, ok := c.tablesCol.Load(parsedSQL.Tables[0].Name)
-	if ok {
-		return fmt.Errorf("table %s defined twice", parsedSQL.Tables[0].Name)
-	}
-
-	c.tablesCol.Store(parsedSQL.Tables[0].Name, parsedSQL.DDLActions[0].ColumnDetails)
 
 	return nil
+}
+
+// removeColumn returns a new slice with the named column removed.
+func removeColumn(cols []postgresparser.DDLColumn, name string) []postgresparser.DDLColumn {
+	result := cols[:0:0]
+	for _, col := range cols {
+		if col.Name != name {
+			result = append(result, col)
+		}
+	}
+	return result
 }
