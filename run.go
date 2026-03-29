@@ -9,7 +9,7 @@ import (
 	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
 )
 
-func run(ctx context.Context) error {
+func run(ctx context.Context, std bool) error {
 	c := &cli{}
 
 	files, err := os.ReadDir(filepath.Join(dbDirectory, schemaDirectory))
@@ -80,5 +80,5 @@ func run(ctx context.Context) error {
 	}
 	defer baseFile.Close()
 
-	return generateBaseFile(baseFile)
+	return generateBaseFile(baseFile, std)
 }

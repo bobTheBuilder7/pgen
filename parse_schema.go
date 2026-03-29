@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -25,8 +26,7 @@ func (c *cli) parseSchema(_ context.Context, reader io.Reader) error {
 
 		parsed, err := postgresparser.ParseSQLStrict(stmt)
 		if err != nil {
-			// Non-parseable statements (comments, unsupported syntax) are skipped
-			continue
+			return errors.New("unknown migration")
 		}
 
 		for _, action := range parsed.DDLActions {

@@ -6,7 +6,14 @@ import (
 	"github.com/bobTheBuilder7/gen"
 )
 
-func generateBaseFile(w io.Writer) error {
+func generateBaseFile(w io.Writer, std bool) error {
+	if std {
+		return generateBaseFileStd(w)
+	}
+	return generateBaseFilePgx(w)
+}
+
+func generateBaseFilePgx(w io.Writer) error {
 	f := gen.NewFile("db")
 
 	f.AddBlock(gen.Import("", "context"))
@@ -33,9 +40,34 @@ func generateBaseFile(w io.Writer) error {
 	))
 
 	_, err := f.WriteTo(w)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	return nil
+func generateBaseFileStd(w io.Writer) error {
+	f := gen.NewFile("db")
+
+	f.AddBlock(gen.Import("", "context"))
+	f.AddBlock(gen.Import("", "database/sql"))
+
+	f.AddBlock(gen.Interface("DBTX",
+		gen.Method{Name: "ExecContext", Params: "context.Context, string, ...interface{}", Returns: "(sql.Result, error)"},
+		gen.Method{Name: "QueryContext", Params: "context.Context, string, ...interface{}", Returns: "(*sql.Rows, error)"},
+		gen.Method{Name: "QueryRowContext", Params: "context.Context, string, ...interface{}", Returns: "*sql.Row"},
+		gen.Method{Name: "PrepareContext", Params: "context.Context, string", Returns: "(*sql.Stmt, error)"},
+	))
+
+	f.AddBlock(gen.Func("New", "db DBTX", "*Queries",
+		gen.Line("return &Queries{db: db}"),
+	))
+
+	f.AddBlock(gen.Struct("Queries",
+		gen.Field{Name: "db", Type: "DBTX"},
+	))
+
+	f.AddBlock(gen.MethodFunc("q *Queries", "WithTx", "tx *sql.Tx", "*Queries",
+		gen.Line("return &Queries{db: tx}"),
+	))
+
+	_, err := f.WriteTo(w)
+	return err
 }

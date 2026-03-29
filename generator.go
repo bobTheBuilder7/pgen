@@ -255,7 +255,7 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 
 	paramNames, paramTypes, err := c.resolveParams(parsedSQL)
 	if err != nil {
-		return err
+		return errors.Join(err, errors.New("generateExec failed"))
 	}
 
 	// Override param names if using named params

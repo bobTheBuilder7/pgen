@@ -23,8 +23,7 @@ func TestParseSchema_SingleCreateTable(t *testing.T) {
 
 func TestParseSchema_MultipleStatementsOnlyStoresCreateTable(t *testing.T) {
 	c := &cli{}
-	sql := `
-CREATE TABLE employees (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL);
+	sql := `CREATE TABLE employees (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL);
 CREATE INDEX idx_employees_name ON employees (name);
 INSERT INTO employees (name) VALUES ('seed');
 `
@@ -87,8 +86,7 @@ func TestParseSchema_DuplicateCreateTableReturnsError(t *testing.T) {
 
 func TestParseSchema_CreateTableThenDropColumnInSameFile(t *testing.T) {
 	c := &cli{}
-	sql := `
-CREATE TABLE employees (id BIGSERIAL PRIMARY KEY, salary INTEGER);
+	sql := `CREATE TABLE employees (id BIGSERIAL PRIMARY KEY, salary INTEGER);
 ALTER TABLE employees DROP COLUMN salary;
 `
 	err := c.parseSchema(context.Background(), strings.NewReader(sql))
