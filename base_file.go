@@ -21,9 +21,9 @@ func generateBaseFilePgx(w io.Writer) error {
 	f.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
 
 	f.AddBlock(gen.Interface("DBTX",
-		gen.Method{Name: "Exec", Params: "context.Context, string, ...interface{}", Returns: "(pgconn.CommandTag, error)"},
-		gen.Method{Name: "Query", Params: "context.Context, string, ...interface{}", Returns: "(pgx.Rows, error)"},
-		gen.Method{Name: "QueryRow", Params: "context.Context, string, ...interface{}", Returns: "pgx.Row"},
+		gen.Method{Name: "Exec", Params: "context.Context, string, ...any", Returns: "(pgconn.CommandTag, error)"},
+		gen.Method{Name: "Query", Params: "context.Context, string, ...any", Returns: "(pgx.Rows, error)"},
+		gen.Method{Name: "QueryRow", Params: "context.Context, string, ...any", Returns: "pgx.Row"},
 		gen.Method{Name: "SendBatch", Params: "context.Context, *pgx.Batch", Returns: "pgx.BatchResults"},
 	))
 
@@ -50,9 +50,9 @@ func generateBaseFileStd(w io.Writer) error {
 	f.AddBlock(gen.Import("", "database/sql"))
 
 	f.AddBlock(gen.Interface("DBTX",
-		gen.Method{Name: "ExecContext", Params: "context.Context, string, ...interface{}", Returns: "(sql.Result, error)"},
-		gen.Method{Name: "QueryContext", Params: "context.Context, string, ...interface{}", Returns: "(*sql.Rows, error)"},
-		gen.Method{Name: "QueryRowContext", Params: "context.Context, string, ...interface{}", Returns: "*sql.Row"},
+		gen.Method{Name: "ExecContext", Params: "context.Context, string, ...any", Returns: "(sql.Result, error)"},
+		gen.Method{Name: "QueryContext", Params: "context.Context, string, ...any", Returns: "(*sql.Rows, error)"},
+		gen.Method{Name: "QueryRowContext", Params: "context.Context, string, ...any", Returns: "*sql.Row"},
 		gen.Method{Name: "PrepareContext", Params: "context.Context, string", Returns: "(*sql.Stmt, error)"},
 	))
 

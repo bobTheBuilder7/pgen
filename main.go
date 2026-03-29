@@ -15,6 +15,7 @@ const sqlConstSuffix = "SQL"
 
 type cli struct {
 	tablesCol syncmap.Map[string, []postgresparser.DDLColumn]
+	std       bool
 }
 
 func main() {

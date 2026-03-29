@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"testing"
 
@@ -10,6 +11,61 @@ import (
 func generateQuery(t *testing.T, c *cli, name, queryType, sql string) error {
 	t.Helper()
 	return c.generateCode([]Query{{name: name, t: queryType, sql: sql}}, io.Discard)
+}
+
+func generateQueryOutput(t *testing.T, c *cli, name, queryType, sql string) (string, error) {
+	t.Helper()
+	var buf bytes.Buffer
+	err := c.generateCode([]Query{{name: name, t: queryType, sql: sql}}, &buf)
+	return buf.String(), err
+}
+
+// --- std mode method names ---
+
+func TestGenerateCode_StdModeSelectOneUsesQueryRowContext(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	c.std = true
+	out, err := generateQueryOutput(t, c, "GetUser", "one", `SELECT users.id FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryRowContext`)
+}
+
+func TestGenerateCode_StdModeSelectManyUsesQueryContext(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	c.std = true
+	out, err := generateQueryOutput(t, c, "ListUsers", "many", `SELECT users.id FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryContext`)
+}
+
+func TestGenerateCode_StdModeExecUsesExecContext(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	c.std = true
+	out, err := generateQueryOutput(t, c, "DeleteUser", "exec", `DELETE FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `ExecContext`)
+}
+
+func TestGenerateCode_StdModeExecResultReturnsSQLResult(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	c.std = true
+	out, err := generateQueryOutput(t, c, "DeleteUser", "execresult", `DELETE FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `sql\.Result`)
+}
+
+func TestGenerateCode_DefaultModeUsesQueryRow(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	out, err := generateQueryOutput(t, c, "GetUser", "one", `SELECT users.id FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryRow[^C]`) // QueryRow but not QueryRowContext
+}
+
+func TestGenerateCode_DefaultModeExecResultReturnsPgconnCommandTag(t *testing.T) {
+	c := testCliWithUsersSchema(t)
+	out, err := generateQueryOutput(t, c, "DeleteUser", "execresult", `DELETE FROM users WHERE users.id = $1;`)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `pgconn\.CommandTag`)
 }
 
 // --- UPDATE without WHERE ---

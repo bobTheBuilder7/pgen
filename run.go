@@ -10,7 +10,7 @@ import (
 )
 
 func run(ctx context.Context, std bool) error {
-	c := &cli{}
+	c := &cli{std: std}
 
 	files, err := os.ReadDir(filepath.Join(dbDirectory, schemaDirectory))
 	if err != nil {

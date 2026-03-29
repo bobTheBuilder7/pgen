@@ -97,8 +97,13 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	generatedFile := gen.NewFile("db")
 
 	generatedFile.AddBlock(gen.Import("", "context"))
-	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
-	generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
+	if c.std {
+		generatedFile.AddBlock(gen.Import("", "database/sql"))
+	} else {
+		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
+		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
+	}
+
 
 	for _, query := range queries {
 		switch query.t {
@@ -182,17 +187,25 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 
 			switch query.t {
 			case "one":
+				queryRowMethod := "q.db.QueryRow"
+				if c.std {
+					queryRowMethod = "q.db.QueryRowContext"
+				}
 				generatedFile.AddBlock(
 					gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
-						gen.Call("row", "q.db.QueryRow", callArgs...),
+						gen.Call("row", queryRowMethod, callArgs...),
 						gen.Line("var i "+rowStructName),
 						gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
 						gen.Line("return i, err"),
 					),
 				)
 			case "many":
+				queryManyMethod := "q.db.Query"
+				if c.std {
+					queryManyMethod = "q.db.QueryContext"
+				}
 				body := []fmt.Stringer{
-					gen.Call("rows, err", "q.db.Query", callArgs...),
+					gen.Call("rows, err", queryManyMethod, callArgs...),
 					gen.Line("if err != nil {"),
 					gen.Line("return nil, err"),
 					gen.Line("}"),
@@ -282,11 +295,17 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 		rowStructName := query.name + "Row"
 		generatedFile.AddBlock(gen.Struct(rowStructName, structFields...))
 
+		queryRowMethod := "q.db.QueryRow"
+		queryManyMethod := "q.db.Query"
+		if c.std {
+			queryRowMethod = "q.db.QueryRowContext"
+			queryManyMethod = "q.db.QueryContext"
+		}
 		switch query.t {
 		case "one":
 			generatedFile.AddBlock(
 				gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
-					gen.Call("row", "q.db.QueryRow", callArgs...),
+					gen.Call("row", queryRowMethod, callArgs...),
 					gen.Line("var i "+rowStructName),
 					gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
 					gen.Line("return i, err"),
@@ -294,7 +313,7 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 			)
 		case "many":
 			body := []fmt.Stringer{
-				gen.Call("rows, err", "q.db.Query", callArgs...),
+				gen.Call("rows, err", queryManyMethod, callArgs...),
 				gen.Line("if err != nil {"),
 				gen.Line("return nil, err"),
 				gen.Line("}"),
@@ -318,18 +337,24 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 		return nil
 	}
 
+	execMethod := "q.db.Exec"
+	execResultType := "pgconn.CommandTag"
+	if c.std {
+		execMethod = "q.db.ExecContext"
+		execResultType = "sql.Result"
+	}
 	switch query.t {
 	case "exec":
 		generatedFile.AddBlock(
 			gen.MethodFunc("q *Queries", query.name, funcParams, "error",
-				gen.Call("_, err", "q.db.Exec", callArgs...),
+				gen.Call("_, err", execMethod, callArgs...),
 				gen.Line("return err"),
 			),
 		)
 	case "execresult":
 		generatedFile.AddBlock(
-			gen.MethodFunc("q *Queries", query.name, funcParams, "(pgconn.CommandTag, error)",
-				gen.Line("return q.db.Exec("+buildCallArgsString(callArgs)+")"),
+			gen.MethodFunc("q *Queries", query.name, funcParams, "("+execResultType+", error)",
+				gen.Line("return "+execMethod+"("+buildCallArgsString(callArgs)+")"),
 			),
 		)
 	}
