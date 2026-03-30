@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
+	"github.com/bobTheBuilder7/assert"
 	"github.com/bobTheBuilder7/gen"
-	"github.com/bobTheBuilder7/pgen/assert"
 	"github.com/valkdb/postgresparser"
 )
 

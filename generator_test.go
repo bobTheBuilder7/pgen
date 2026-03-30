@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/bobTheBuilder7/pgen/assert"
+	"github.com/bobTheBuilder7/assert"
 )
 
 func generateQuery(t *testing.T, c *cli, name, queryType, sql string) error {

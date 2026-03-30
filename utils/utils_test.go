@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	"github.com/bobTheBuilder7/pgen/assert"
+	"github.com/bobTheBuilder7/assert"
 )
 
 func TestToPascalCase_SingleWord(t *testing.T) {
