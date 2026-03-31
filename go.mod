@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/bobTheBuilder7/assert v1.0.0
 	github.com/bobTheBuilder7/gen v0.0.6
-	github.com/bradfitz/gopglite v0.0.0-20260128220817-b649918a2f89
+	github.com/bobTheBuilder7/gopglite v0.0.0-20260331011518-1fb3eef12be0
 	github.com/valkdb/postgresparser v1.1.7
 )
 

@@ -1,56 +1,39 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"strings"
 	"testing"
 
 	"github.com/bobTheBuilder7/assert"
-	_ "github.com/bradfitz/gopglite"
 )
 
-func testCliWithDB(t *testing.T) *cli {
-	t.Helper()
-
-	db, err := sql.Open("pglite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open pglite: %v", err)
-	}
-
-	t.Cleanup(func() { db.Close() })
-
-	return &cli{db: db}
-}
-
 func TestRunMigration_CreateTable(t *testing.T) {
-	c := testCliWithDB(t)
-	err := c.runMigration(context.Background(), "001_create_users.up.sql", strings.NewReader(`
-		CREATE TABLE users (
-			id SERIAL PRIMARY KEY,
-			name TEXT NOT NULL
-		);
-	`))
+	c := testCliWithEmptyDB(t)
+	err := c.runMigration(t.Context(), "001_create_organizations.up.sql", strings.NewReader(`CREATE TABLE organizations (
+    id     BIGSERIAL PRIMARY KEY,
+    domain TEXT     NOT NULL UNIQUE,
+    name   TEXT     NOT NULL
+);`))
 	assert.Nil(t, err)
 
 	// verify table exists
 	var count int
-	err = c.db.QueryRowContext(context.Background(),
-		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'users'`,
+	err = c.db.QueryRowContext(t.Context(),
+		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'organizations'`,
 	).Scan(&count)
 	assert.Nil(t, err)
 	assert.Equal(t, count, 1)
 }
 
 func TestRunMigration_InvalidSQLReturnsError(t *testing.T) {
-	c := testCliWithDB(t)
-	err := c.runMigration(context.Background(), "001_bad.up.sql", strings.NewReader(`THIS IS NOT SQL;`))
+	c := testCliWithEmptyDB(t)
+	err := c.runMigration(t.Context(), "001_bad.up.sql", strings.NewReader(`THIS IS NOT SQL;`))
 	assert.NotNil(t, err)
 }
 
 func TestRunMigration_ErrorIncludesMigrationName(t *testing.T) {
-	c := testCliWithDB(t)
-	err := c.runMigration(context.Background(), "001_bad.up.sql", strings.NewReader(`THIS IS NOT SQL;`))
+	c := testCliWithEmptyDB(t)
+	err := c.runMigration(t.Context(), "001_bad.up.sql", strings.NewReader(`THIS IS NOT SQL;`))
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `001_bad\.up\.sql`)
 }
@@ -59,7 +42,7 @@ func TestRunMigration_ErrorIncludesMigrationName(t *testing.T) {
 func runMigrations(t *testing.T, c *cli, migrations [][2]string) error {
 	t.Helper()
 	for _, m := range migrations {
-		if err := c.runMigration(context.Background(), m[0], strings.NewReader(m[1])); err != nil {
+		if err := c.runMigration(t.Context(), m[0], strings.NewReader(m[1])); err != nil {
 			return err
 		}
 	}
@@ -68,7 +51,7 @@ func runMigrations(t *testing.T, c *cli, migrations [][2]string) error {
 
 func tableColumns(t *testing.T, c *cli, table string) []string {
 	t.Helper()
-	rows, err := c.db.QueryContext(context.Background(),
+	rows, err := c.db.QueryContext(t.Context(),
 		`SELECT column_name FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position`,
 		table,
 	)
@@ -90,7 +73,7 @@ func tableColumns(t *testing.T, c *cli, table string) []string {
 // --- multiple migration files ---
 
 func TestMultipleMigrations_TablesCreatedInOrder(t *testing.T) {
-	c := testCliWithDB(t)
+	c := testCliWithEmptyDB(t)
 	err := runMigrations(t, c, [][2]string{
 		{"001_create_products.up.sql", `CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT NOT NULL);`},
 		{"002_create_categories.up.sql", `CREATE TABLE categories (id SERIAL PRIMARY KEY, label TEXT NOT NULL);`},
@@ -99,7 +82,7 @@ func TestMultipleMigrations_TablesCreatedInOrder(t *testing.T) {
 	assert.Nil(t, err)
 
 	var count int
-	err = c.db.QueryRowContext(context.Background(),
+	err = c.db.QueryRowContext(t.Context(),
 		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('products', 'categories', 'orders')`,
 	).Scan(&count)
 	assert.Nil(t, err)
@@ -107,7 +90,7 @@ func TestMultipleMigrations_TablesCreatedInOrder(t *testing.T) {
 }
 
 func TestMultipleMigrations_AlterTableAddColumn(t *testing.T) {
-	c := testCliWithDB(t)
+	c := testCliWithEmptyDB(t)
 	err := runMigrations(t, c, [][2]string{
 		{"001_create_vendors.up.sql", `CREATE TABLE vendors (id SERIAL PRIMARY KEY, name TEXT NOT NULL);`},
 		{"002_add_email.up.sql", `ALTER TABLE vendors ADD COLUMN email TEXT;`},
@@ -120,7 +103,7 @@ func TestMultipleMigrations_AlterTableAddColumn(t *testing.T) {
 }
 
 func TestMultipleMigrations_DropColumn(t *testing.T) {
-	c := testCliWithDB(t)
+	c := testCliWithEmptyDB(t)
 	err := runMigrations(t, c, [][2]string{
 		{"001_create_invoices.up.sql", `CREATE TABLE invoices (id SERIAL PRIMARY KEY, note TEXT, amount INT NOT NULL);`},
 		{"002_drop_note.up.sql", `ALTER TABLE invoices DROP COLUMN note;`},
@@ -132,7 +115,7 @@ func TestMultipleMigrations_DropColumn(t *testing.T) {
 }
 
 func TestMultipleMigrations_FailedMigrationStopsChain(t *testing.T) {
-	c := testCliWithDB(t)
+	c := testCliWithEmptyDB(t)
 	err := runMigrations(t, c, [][2]string{
 		{"001_create_tickets.up.sql", `CREATE TABLE tickets (id SERIAL PRIMARY KEY);`},
 		{"002_bad.up.sql", `THIS IS NOT SQL;`},
@@ -143,23 +126,23 @@ func TestMultipleMigrations_FailedMigrationStopsChain(t *testing.T) {
 
 	// 003 should not have been applied
 	var count int
-	_ = c.db.QueryRowContext(context.Background(),
+	_ = c.db.QueryRowContext(t.Context(),
 		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'comments'`,
 	).Scan(&count)
 	assert.Equal(t, count, 0)
 }
 
 func TestRunMigration_MultipleStatements(t *testing.T) {
-	c := testCliWithDB(t)
-	err := c.runMigration(context.Background(), "001_create_tables.up.sql", strings.NewReader(`
+	c := testCliWithEmptyDB(t)
+	err := c.runMigration(t.Context(), "001_create_tables.up.sql", strings.NewReader(`
 		CREATE TABLE employees (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
-		CREATE TABLE posts (id SERIAL PRIMARY KEY, title TEXT NOT NULL);
+		CREATE TABLE ads (id SERIAL PRIMARY KEY, title TEXT NOT NULL);
 	`))
 	assert.Nil(t, err)
 
 	var count int
-	err = c.db.QueryRowContext(context.Background(),
-		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('employees', 'posts')`,
+	err = c.db.QueryRowContext(t.Context(),
+		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('employees', 'ads')`,
 	).Scan(&count)
 	assert.Nil(t, err)
 	assert.Equal(t, count, 2)

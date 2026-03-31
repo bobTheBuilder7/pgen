@@ -14,6 +14,7 @@ func parseQueries(t *testing.T, sql string) ([]Query, error) {
 }
 
 func TestParseQuery_SingleQuery(t *testing.T) {
+	t.Parallel()
 	queries, err := parseQueries(t, `
 -- name: GetUser :one
 SELECT users.id FROM users WHERE users.id = $1;
@@ -25,6 +26,7 @@ SELECT users.id FROM users WHERE users.id = $1;
 }
 
 func TestParseQuery_MultipleQueries(t *testing.T) {
+	t.Parallel()
 	queries, err := parseQueries(t, `
 -- name: GetUser :one
 SELECT users.id FROM users WHERE users.id = $1;
@@ -39,6 +41,7 @@ SELECT users.id FROM users;
 }
 
 func TestParseQuery_AllQueryTypes(t *testing.T) {
+	t.Parallel()
 	queries, err := parseQueries(t, `
 -- name: GetUser :one
 SELECT users.id FROM users WHERE users.id = $1;
@@ -61,6 +64,7 @@ INSERT INTO users (name) VALUES ($1);
 }
 
 func TestParseQuery_SQLBodyCaptured(t *testing.T) {
+	t.Parallel()
 	queries, err := parseQueries(t, `
 -- name: GetUser :one
 SELECT users.id FROM users WHERE users.id = $1;
@@ -71,6 +75,7 @@ SELECT users.id FROM users WHERE users.id = $1;
 }
 
 func TestParseQuery_MultilineSQL(t *testing.T) {
+	t.Parallel()
 	queries, err := parseQueries(t, `
 -- name: GetUser :one
 SELECT users.id
@@ -84,6 +89,7 @@ WHERE users.id = $1;
 }
 
 func TestParseQuery_InvalidHeaderReturnsError(t *testing.T) {
+	t.Parallel()
 	_, err := parseQueries(t, `
 -- name: GetUser
 SELECT users.id FROM users WHERE users.id = $1;
@@ -92,6 +98,7 @@ SELECT users.id FROM users WHERE users.id = $1;
 }
 
 func TestParseQuery_EmptyInput(t *testing.T) {
+	t.Parallel()
 	queries, err := parseQueries(t, ``)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 0)

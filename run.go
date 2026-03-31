@@ -4,106 +4,136 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
+	"fmt"
 
-	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
+	_ "github.com/bobTheBuilder7/gopglite"
 	"github.com/bobTheBuilder7/pgen/syncmap"
-	_ "github.com/bradfitz/gopglite"
-	"github.com/valkdb/postgresparser"
 )
 
+type Column struct {
+	Name     string
+	Type     string
+	Nullable bool
+}
+
 type cli struct {
-	tablesCol syncmap.Map[string, []postgresparser.DDLColumn]
-	std       bool
+	tablesCol syncmap.Map[string, []Column]
 	db        *sql.DB
 }
 
-func run(ctx context.Context, std bool) error {
+func run(ctx context.Context, _ bool) error {
 	db, err := sql.Open("pglite", ":memory:")
 	if err != nil {
 		return errors.Join(err, errors.New("pglite db failed"))
 	}
+	defer db.Close()
 
-	c := &cli{std: std, db: db}
+	db.SetMaxOpenConns(1)
+	db.SetConnMaxIdleTime(0)
+	db.SetConnMaxLifetime(0)
 
-	files, err := os.ReadDir(filepath.Join(dbDirectory, schemaDirectory))
+	c := &cli{db: db}
+
+	_, err = c.db.ExecContext(ctx, `CREATE TABLE users (
+		id BIGSERIAL PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE,
+		email TEXT NOT NULL,
+		age SMALLINT,
+		status SMALLINT NOT NULL,
+		role_id INTEGER NOT NULL,
+		login_count INTEGER,
+		org_id BIGINT NOT NULL,
+		referrer_id BIGINT,
+		active BOOLEAN DEFAULT TRUE,
+		verified BOOLEAN NOT NULL DEFAULT FALSE
+);`)
 	if err != nil {
 		return err
 	}
 
-	var migrationNames []string
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".up.sql") {
-			migrationNames = append(migrationNames, file.Name())
-		}
-	}
-	sortMigrations(migrationNames)
-
-	for _, name := range migrationNames {
-		f, err := os.Open(filepath.Join(dbDirectory, schemaDirectory, name))
-		if err != nil {
-			return err
-		}
-		err = c.runMigration(ctx, name, f)
-		f.Close()
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := c.loadSchemaFromDB(ctx); err != nil {
-		return err
-	}
-
-	queryFiles, err := os.ReadDir(filepath.Join(dbDirectory, queriesDirectory))
+	err = c.loadSchemaFromDB(ctx)
 	if err != nil {
 		return err
 	}
 
-	for _, file := range queryFiles {
-		filename := file.Name()
+	fmt.Println(c.tablesCol.Load("users"))
 
-		if !strings.HasSuffix(filename, ".sql") {
-			continue
-		}
+	// files, err := os.ReadDir(filepath.Join(dbDirectory, migrationsDirectory))
+	// if err != nil {
+	// 	return err
+	// }
 
-		f, err := os.Open(filepath.Join(dbDirectory, queriesDirectory, filename))
-		if err != nil {
-			return err
-		}
+	// var migrationNames []string
+	// for _, file := range files {
+	// 	if strings.HasSuffix(file.Name(), ".up.sql") {
+	// 		migrationNames = append(migrationNames, file.Name())
+	// 	}
+	// }
+	// sortMigrations(migrationNames)
 
-		queries, err := parseFileToQueries(ctx, f)
-		f.Close()
-		if err != nil {
-			return err
-		}
+	// for _, name := range migrationNames {
+	// 	f, err := os.Open(filepath.Join(dbDirectory, migrationsDirectory, name))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	err = c.runMigration(ctx, name, f)
+	// 	f.Close()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
-		buf := bytesbufferpool.Get()
-		err = c.generateCode(queries, buf)
-		if err != nil {
-			bytesbufferpool.Put(buf)
-			return err
-		}
+	// if err := c.loadSchemaFromDB(ctx); err != nil {
+	// 	return err
+	// }
 
-		err = os.WriteFile(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)), buf.Bytes(), 0644)
-		bytesbufferpool.Put(buf)
-		if err != nil {
-			return err
-		}
-	}
+	// queryFiles, err := os.ReadDir(filepath.Join(dbDirectory, queriesDirectory))
+	// if err != nil {
+	// 	return err
+	// }
 
-	baseFile, err := os.Create("./db/db.go")
-	if err != nil {
-		return err
-	}
-	defer baseFile.Close()
+	// for _, file := range queryFiles {
+	// 	filename := file.Name()
 
-	err = generateBaseFile(baseFile, std)
-	if err != nil {
-		return errors.Join(err, errors.New("generateBaseFile failed"))
-	}
+	// 	if !strings.HasSuffix(filename, ".sql") {
+	// 		continue
+	// 	}
+
+	// 	f, err := os.Open(filepath.Join(dbDirectory, queriesDirectory, filename))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	queries, err := parseFileToQueries(ctx, f)
+	// 	f.Close()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	buf := bytesbufferpool.Get()
+	// 	err = c.generateCode(ctx, queries, buf, std)
+	// 	if err != nil {
+	// 		bytesbufferpool.Put(buf)
+	// 		return err
+	// 	}
+
+	// 	err = os.WriteFile(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)), buf.Bytes(), 0644)
+	// 	bytesbufferpool.Put(buf)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// baseFile, err := os.Create("./db/db.go")
+	// if err != nil {
+	// 	return err
+	// }
+	// defer baseFile.Close()
+
+	// err = generateBaseFile(baseFile, std)
+	// if err != nil {
+	// 	return errors.Join(err, errors.New("generateBaseFile failed"))
+	// }
 
 	return nil
 }

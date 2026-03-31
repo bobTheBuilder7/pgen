@@ -93,15 +93,10 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 	}
 
 	if tableName == "" {
-		return "", fmt.Errorf("could not resolve table for column %q", expr)
+		return "string", nil
 	}
 
-	// Look up schema columns
-	ddlColumns, ok := c.tablesCol.Load(tableName)
-	if !ok {
-		return "", fmt.Errorf("table %s not found in schema", tableName)
-	}
-
+	ddlColumns, _ := c.tablesCol.Load(tableName)
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
 			nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, tables)
@@ -109,7 +104,7 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 		}
 	}
 
-	return "", fmt.Errorf("column %q not found in table %q", colName, tableName)
+	return "string", nil
 }
 
 // resolveAggregationType resolves the PG type and nullability for an aggregation
@@ -181,21 +176,17 @@ func (c *cli) resolveSimpleColumnType(expr string, tables []postgresparser.Table
 	}
 
 	if tableName == "" {
-		return "", fmt.Errorf("could not resolve table for column %q", expr)
+		return "text", nil
 	}
 
-	ddlColumns, ok := c.tablesCol.Load(tableName)
-	if !ok {
-		return "", fmt.Errorf("table %s not found in schema", tableName)
-	}
-
+	ddlColumns, _ := c.tablesCol.Load(tableName)
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
 			return ddlCol.Type, nil
 		}
 	}
 
-	return "", fmt.Errorf("column %s not found in table %s", colName, tableName)
+	return "text", nil
 }
 
 // splitTopLevelArgs splits a comma-separated argument string, respecting nested
@@ -266,24 +257,15 @@ func (c *cli) resolveReturning(parsedSQL *postgresparser.ParsedQuery) ([]gen.Fie
 			tableName = parsedSQL.Tables[0].Name
 		}
 
-		if tableName == "" {
-			return nil, nil, fmt.Errorf("could not resolve table for returning column %s", col.Column)
-		}
-
-		ddlColumns, ok := c.tablesCol.Load(tableName)
-		if !ok {
-			return nil, nil, fmt.Errorf("table %s not found in schema", tableName)
-		}
-
-		var goType string
-		for _, ddlCol := range ddlColumns {
-			if ddlCol.Name == col.Column {
-				goType = pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
-				break
+		goType := "string"
+		if tableName != "" {
+			ddlColumns, _ := c.tablesCol.Load(tableName)
+			for _, ddlCol := range ddlColumns {
+				if ddlCol.Name == col.Column {
+					goType = pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
+					break
+				}
 			}
-		}
-		if goType == "" {
-			return nil, nil, fmt.Errorf("column %s not found in table %s", col.Column, tableName)
 		}
 
 		fieldName := utils.ToPascalCase(col.Column)

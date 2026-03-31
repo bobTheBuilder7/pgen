@@ -3,15 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-
-	"github.com/valkdb/postgresparser"
 )
 
 func (c *cli) loadSchemaFromDB(ctx context.Context) error {
 	rows, err := c.db.QueryContext(ctx, `
-		SELECT table_name, column_name, data_type, is_nullable
+		SELECT table_name, column_name, data_type, is_nullable, table_schema
 		FROM information_schema.columns
-		WHERE table_schema = 'public'
+		WHERE table_schema = 'pg_catalog'
 		ORDER BY table_name, ordinal_position
 	`)
 	if err != nil {
@@ -20,11 +18,12 @@ func (c *cli) loadSchemaFromDB(ctx context.Context) error {
 	defer rows.Close()
 
 	for rows.Next() {
-		var tableName, columnName, dataType, isNullable string
-		if err := rows.Scan(&tableName, &columnName, &dataType, &isNullable); err != nil {
+		var tableName, columnName, dataType, isNullable, tableSchema string
+		if err := rows.Scan(&tableName, &columnName, &dataType, &isNullable, &tableSchema); err != nil {
 			return err
 		}
-		col := postgresparser.DDLColumn{
+
+		col := Column{
 			Name:     columnName,
 			Type:     dataType,
 			Nullable: isNullable == "YES",

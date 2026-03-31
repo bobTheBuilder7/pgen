@@ -4,8 +4,8 @@ github.com/bobTheBuilder7/assert v1.0.0 h1:ED55Gq7fLGeB/Xpg17ilV8IQ1Ivhi2VeRY3jG
 github.com/bobTheBuilder7/assert v1.0.0/go.mod h1:doXACb4VYWYeEcvyHgVCyLbhTOb6bVO0esDYMOWn/r0=
 github.com/bobTheBuilder7/gen v0.0.6 h1:9FRehljr6E7M+bBV1AakKQs/VXowXVrBlGbubd65ML4=
 github.com/bobTheBuilder7/gen v0.0.6/go.mod h1:mFOJLXJ2YLhDQ7oh+A3Lh8N4XH0rMU6HBZizz5w7eyg=
-github.com/bradfitz/gopglite v0.0.0-20260128220817-b649918a2f89 h1:Rn/u9Lo3aMMh2AdDE+eQIHZACBOzcqVWV2UbRxYrUD4=
-github.com/bradfitz/gopglite v0.0.0-20260128220817-b649918a2f89/go.mod h1:nI9EReFzjAfVjzR5fWqSl2A8lU2QosT0Dx3jyohsQW4=
+github.com/bobTheBuilder7/gopglite v0.0.0-20260331011518-1fb3eef12be0 h1:2dyQkzu/iKqiZ0FIvsJUPl8l10rUkUgyW0L1639z7ho=
+github.com/bobTheBuilder7/gopglite v0.0.0-20260331011518-1fb3eef12be0/go.mod h1:9pSfR6s4WZtA7DzAEmq4AlqHeT4L0+tk+OhwnJunbJ0=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

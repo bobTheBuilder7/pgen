@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -93,11 +94,11 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 	}
 }
 
-func (c *cli) generateCode(queries []Query, output io.Writer) error {
+func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Writer, std bool) error {
 	generatedFile := gen.NewFile("db")
 
 	generatedFile.AddBlock(gen.Import("", "context"))
-	if c.std {
+	if std {
 		generatedFile.AddBlock(gen.Import("", "database/sql"))
 	} else {
 		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
@@ -118,6 +119,13 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 		}
 		// Use converted SQL for both parsing and the generated const (pgx needs $N)
 		sqlForConst := sqlForParsing
+
+		// Validate query against the live DB
+		stmt, err := c.db.PrepareContext(ctx, sqlForParsing)
+		if err != nil {
+			return fmt.Errorf("query %q: %w", query.name, err)
+		}
+		stmt.Close()
 
 		parsedSQL, err := postgresparser.ParseSQLStrict(sqlForParsing)
 		if err != nil {
@@ -187,7 +195,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 			switch query.t {
 			case "one":
 				queryRowMethod := "q.db.QueryRow"
-				if c.std {
+				if std {
 					queryRowMethod = "q.db.QueryRowContext"
 				}
 				generatedFile.AddBlock(
@@ -200,7 +208,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 				)
 			case "many":
 				queryManyMethod := "q.db.Query"
-				if c.std {
+				if std {
 					queryManyMethod = "q.db.QueryContext"
 				}
 				body := []fmt.Stringer{
@@ -225,21 +233,21 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 					gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
 				)
 			case "exec", "execresult":
-				return c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams)
+				return c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std)
 			default:
 				return fmt.Errorf("query type %s not supported for SELECT", query.t)
 			}
 
 		case postgresparser.QueryCommandInsert:
-			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams); err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std); err != nil {
 				return err
 			}
 		case postgresparser.QueryCommandUpdate:
-			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams); err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std); err != nil {
 				return err
 			}
 		case postgresparser.QueryCommandDelete:
-			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams); err != nil {
+			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std); err != nil {
 				return err
 			}
 		default:
@@ -255,7 +263,7 @@ func (c *cli) generateCode(queries []Query, output io.Writer) error {
 	return nil
 }
 
-func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *postgresparser.ParsedQuery, sqlForConst string, namedParams []string) error {
+func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *postgresparser.ParsedQuery, sqlForConst string, namedParams []string, std bool) error {
 	hasReturning := len(parsedSQL.Returning) > 0
 
 	if !hasReturning && query.t != "exec" && query.t != "execresult" {
@@ -296,7 +304,7 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 
 		queryRowMethod := "q.db.QueryRow"
 		queryManyMethod := "q.db.Query"
-		if c.std {
+		if std {
 			queryRowMethod = "q.db.QueryRowContext"
 			queryManyMethod = "q.db.QueryContext"
 		}
@@ -338,7 +346,7 @@ func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *post
 
 	execMethod := "q.db.Exec"
 	execResultType := "pgconn.CommandTag"
-	if c.std {
+	if std {
 		execMethod = "q.db.ExecContext"
 		execResultType = "sql.Result"
 	}
