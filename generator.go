@@ -121,11 +121,9 @@ func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Write
 		sqlForConst := sqlForParsing
 
 		// Validate query against the live DB
-		stmt, err := c.db.PrepareContext(ctx, sqlForParsing)
-		if err != nil {
+		if err := c.prepareQuery(ctx, sqlForParsing); err != nil {
 			return fmt.Errorf("query %q: %w", query.name, err)
 		}
-		stmt.Close()
 
 		parsedSQL, err := postgresparser.ParseSQLStrict(sqlForParsing)
 		if err != nil {

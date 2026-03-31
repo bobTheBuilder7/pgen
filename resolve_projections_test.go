@@ -942,3 +942,49 @@ func TestResolveProjections_CoalesceOfCount(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
 }
+
+func TestResolveProjections_FromSubqueryErrors(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT sub.id, sub.name FROM (SELECT users.id, users.name FROM users WHERE users.age > $1) sub WHERE sub.id = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `table sub not found`)
+}
+
+// --- Unknown column / table errors ---
+func TestResolveProjections_UnknownColumnErrors(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.nonexistent FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `nonexistent`)
+}
+
+func TestResolveProjections_UnknownColumnErrorMentionsTable(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.typo_col FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `users`)
+}
+
+func TestResolveProjections_UnknownTableAliasErrors(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT x.id FROM users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `x\.id`)
+}
