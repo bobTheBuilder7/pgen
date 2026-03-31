@@ -15,7 +15,7 @@ type Query struct {
 	sql  string
 }
 
-func parseFileToQueries(ctx context.Context, reader io.Reader) ([]Query, error) {
+func parseFileToQueries(_ context.Context, reader io.Reader) ([]Query, error) {
 	b := bytesbufferpool.Get()
 	defer bytesbufferpool.Put(b)
 

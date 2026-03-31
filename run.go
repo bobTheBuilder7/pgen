@@ -2,15 +2,31 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
+	"github.com/bobTheBuilder7/pgen/syncmap"
+	_ "github.com/bradfitz/gopglite"
+	"github.com/valkdb/postgresparser"
 )
 
+type cli struct {
+	tablesCol syncmap.Map[string, []postgresparser.DDLColumn]
+	std       bool
+	db        *sql.DB
+}
+
 func run(ctx context.Context, std bool) error {
-	c := &cli{std: std}
+	db, err := sql.Open("pglite", ":memory:")
+	if err != nil {
+		return errors.Join(err, errors.New("pglite db failed"))
+	}
+
+	c := &cli{std: std, db: db}
 
 	files, err := os.ReadDir(filepath.Join(dbDirectory, schemaDirectory))
 	if err != nil {
@@ -30,11 +46,15 @@ func run(ctx context.Context, std bool) error {
 		if err != nil {
 			return err
 		}
-		err = c.parseSchema(ctx, f)
+		err = c.runMigration(ctx, name, f)
 		f.Close()
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := c.loadSchemaFromDB(ctx); err != nil {
+		return err
 	}
 
 	queryFiles, err := os.ReadDir(filepath.Join(dbDirectory, queriesDirectory))
@@ -80,5 +100,10 @@ func run(ctx context.Context, std bool) error {
 	}
 	defer baseFile.Close()
 
-	return generateBaseFile(baseFile, std)
+	err = generateBaseFile(baseFile, std)
+	if err != nil {
+		return errors.Join(err, errors.New("generateBaseFile failed"))
+	}
+
+	return nil
 }
