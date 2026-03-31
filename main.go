@@ -21,7 +21,5 @@ func main() {
 	err := run(ctx, *std)
 	if err != nil {
 		fmt.Println(err.Error())
-	} else {
-		fmt.Println("success")
 	}
 }
