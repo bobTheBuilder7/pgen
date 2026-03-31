@@ -105,7 +105,7 @@ func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Write
 		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 	}
 
-	for _, query := range queries {
+	for i, query := range queries {
 		switch query.t {
 		case "one", "many", "exec", "execresult":
 		default:
@@ -121,7 +121,7 @@ func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Write
 		sqlForConst := sqlForParsing
 
 		// Validate query against the live DB
-		if err := c.prepareQuery(ctx, sqlForParsing); err != nil {
+		if err := c.prepareQuery(ctx, sqlForParsing, query.name, i); err != nil {
 			return fmt.Errorf("query %q: %w", query.name, err)
 		}
 

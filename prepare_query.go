@@ -2,15 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 )
 
-func (c *cli) prepareQuery(ctx context.Context, sql string) error {
-	// fmt.Println(sql)
-
-	// _, err := c.db.ExecContext(ctx, "EXPLAIN "+sql)
-	// if err != nil {
-	// 	return fmt.Errorf("invalid query: %w", err)
-	// }
+func (c *cli) prepareQuery(ctx context.Context, sql, name string, i int) error {
+	fmt.Println(sql)
+	_, err := c.db.ExecContext(ctx, fmt.Sprintf("PREPARE pgen_test_%d as %s", i, sql))
+	if err != nil {
+		return fmt.Errorf("invalid query: %s", name)
+	}
 
 	return nil
 }

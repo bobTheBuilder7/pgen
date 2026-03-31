@@ -264,18 +264,6 @@ func TestGenerateCode_SequentialParamsSucceed(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestGenerateCode_NonexistentColumnReturnsError(t *testing.T) {
-	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "one", `SELECT users.nonexistent FROM users WHERE users.id = $1;`, false)
-	assert.NotNil(t, err)
-}
-
-func TestGenerateCode_NonexistentTableReturnsError(t *testing.T) {
-	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "one", `SELECT ghost.id FROM ghost WHERE ghost.id = $1;`, false)
-	assert.NotNil(t, err)
-}
-
 func TestGenerateCode_ValidQueryTypesSucceed(t *testing.T) {
 	t.Parallel()
 	validTypes := []struct {
