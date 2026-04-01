@@ -10,14 +10,14 @@ import (
 
 func generateQuery(t *testing.T, c *cli, name, queryType, sql string, std bool) error {
 	t.Helper()
-	return c.generateCode(t.Context(), []Query{{name: name, t: queryType, sql: sql}}, io.Discard, std)
+	return c.generateCode(t.Context(), []query{{name: name, t: queryType, sql: sql}}, io.Discard, std)
 }
 
 func generateQueryOutput(t *testing.T, c *cli, name, queryType, sql string, std bool) (string, error) {
 	t.Helper()
 
 	buf := new(bytes.Buffer)
-	err := c.generateCode(t.Context(), []Query{{name: name, t: queryType, sql: sql}}, buf, std)
+	err := c.generateCode(t.Context(), []query{{name: name, t: queryType, sql: sql}}, buf, std)
 
 	return buf.String(), err
 }

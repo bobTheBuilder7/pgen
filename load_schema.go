@@ -23,7 +23,7 @@ func (c *cli) loadSchemaFromDB(ctx context.Context) error {
 			return err
 		}
 
-		col := Column{
+		col := dbColumn{
 			Name:     columnName,
 			Type:     dataType,
 			Nullable: isNullable == "YES",

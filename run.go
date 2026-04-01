@@ -4,23 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	_ "github.com/bobTheBuilder7/gopglite"
-	"github.com/bobTheBuilder7/pgen/bytesbufferpool"
 	"github.com/bobTheBuilder7/pgen/syncmap"
 )
 
-type Column struct {
+type dbColumn struct {
 	Name     string
 	Type     string
 	Nullable bool
 }
 
 type cli struct {
-	tablesCol syncmap.Map[string, []Column]
+	tablesCol syncmap.Map[string, []dbColumn]
 	db        *sql.DB
 }
 
@@ -41,7 +41,6 @@ func run(ctx context.Context, std bool) error {
 	if err != nil {
 		return err
 	}
-
 	var migrationNames []string
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".up.sql") {
@@ -75,7 +74,7 @@ func run(ctx context.Context, std bool) error {
 		filename := file.Name()
 
 		if !strings.HasSuffix(filename, ".sql") {
-			continue
+			return fmt.Errorf("%s shouldn't be in queries directory", filename)
 		}
 
 		f, err := os.Open(filepath.Join(dbDirectory, queriesDirectory, filename))
@@ -83,21 +82,27 @@ func run(ctx context.Context, std bool) error {
 			return err
 		}
 
+		defer f.Close()
+
 		queries, err := parseFileToQueries(ctx, f)
-		f.Close()
 		if err != nil {
 			return err
 		}
 
-		buf := bytesbufferpool.Get()
-		err = c.generateCode(ctx, queries, buf, std)
-		if err != nil {
-			bytesbufferpool.Put(buf)
-			return err
+		for _, query := range queries {
+			err = c.testQueryAgainstDB(ctx, query)
+			if err != nil {
+				return err
+			}
 		}
 
-		err = os.WriteFile(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)), buf.Bytes(), 0644)
-		bytesbufferpool.Put(buf)
+		out, err := os.Create(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)))
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		err = c.generateCode(ctx, queries, out, std)
 		if err != nil {
 			return err
 		}

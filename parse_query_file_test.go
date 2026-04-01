@@ -8,7 +8,7 @@ import (
 	"github.com/bobTheBuilder7/assert"
 )
 
-func parseQueries(t *testing.T, sql string) ([]Query, error) {
+func parseQueries(t *testing.T, sql string) ([]query, error) {
 	t.Helper()
 	return parseFileToQueries(context.Background(), strings.NewReader(sql))
 }
@@ -71,7 +71,7 @@ SELECT users.id FROM users WHERE users.id = $1;
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 1)
-	assert.MatchesRegexp(t, queries[0].sql, `SELECT users\.id FROM users WHERE users\.id = \$1`)
+	assert.Equal(t, queries[0].sql, `SELECT users.id FROM users WHERE users.id = $1;`)
 }
 
 func TestParseQuery_MultilineSQL(t *testing.T) {
@@ -84,8 +84,9 @@ WHERE users.id = $1;
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 1)
-	assert.MatchesRegexp(t, queries[0].sql, `SELECT users\.id`)
-	assert.MatchesRegexp(t, queries[0].sql, `FROM users`)
+	assert.Equal(t, queries[0].sql, `SELECT users.id
+FROM users
+WHERE users.id = $1;`)
 }
 
 func TestParseQuery_InvalidHeaderReturnsError(t *testing.T) {

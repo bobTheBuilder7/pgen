@@ -5,10 +5,11 @@ import (
 	"fmt"
 )
 
-func (c *cli) prepareQuery(ctx context.Context, sql, name string, i int) error {
-	_, err := c.db.ExecContext(ctx, fmt.Sprintf("PREPARE pgen_test_%d as %s", i, sql))
+func (c *cli) testQueryAgainstDB(ctx context.Context, query query) error {
+	_, err := c.db.ExecContext(ctx, fmt.Sprintf("PREPARE pgen_test_%s as %s", query.name, query.sql))
 	if err != nil {
-		return fmt.Errorf("invalid query: %s", name)
+		fmt.Println(err.Error())
+		return fmt.Errorf("invalid query: %s", query.name)
 	}
 
 	return nil

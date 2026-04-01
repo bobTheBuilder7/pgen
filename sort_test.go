@@ -7,6 +7,7 @@ import (
 )
 
 func TestMigrationSort_NumericPrefix(t *testing.T) {
+	t.Parallel()
 	files := []string{
 		"010_add_column.up.sql",
 		"001_create_table.up.sql",
@@ -21,6 +22,7 @@ func TestMigrationSort_NumericPrefix(t *testing.T) {
 }
 
 func TestMigrationSort_DatePrefix(t *testing.T) {
+	t.Parallel()
 	files := []string{
 		"2024_01_03_add_column.up.sql",
 		"2024_01_01_create_table.up.sql",
@@ -35,6 +37,7 @@ func TestMigrationSort_DatePrefix(t *testing.T) {
 }
 
 func TestMigrationSort_AlphabeticalNames(t *testing.T) {
+	t.Parallel()
 	files := []string{
 		"create_users.up.sql",
 		"add_posts.up.sql",
@@ -49,6 +52,7 @@ func TestMigrationSort_AlphabeticalNames(t *testing.T) {
 }
 
 func TestMigrationSort_AlreadySorted(t *testing.T) {
+	t.Parallel()
 	files := []string{
 		"001_a.up.sql",
 		"002_b.up.sql",
@@ -63,6 +67,7 @@ func TestMigrationSort_AlreadySorted(t *testing.T) {
 }
 
 func TestMigrationSort_SingleFile(t *testing.T) {
+	t.Parallel()
 	files := []string{"001_create_table.up.sql"}
 	sortMigrations(files)
 	assert.Equal(t, files, []string{"001_create_table.up.sql"})

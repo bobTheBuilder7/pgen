@@ -94,7 +94,7 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 	}
 }
 
-func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Writer, std bool) error {
+func (c *cli) generateCode(_ context.Context, queries []query, output io.Writer, std bool) error {
 	generatedFile := gen.NewFile("db")
 
 	generatedFile.AddBlock(gen.Import("", "context"))
@@ -105,7 +105,7 @@ func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Write
 		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 	}
 
-	for i, query := range queries {
+	for _, query := range queries {
 		switch query.t {
 		case "one", "many", "exec", "execresult":
 		default:
@@ -119,11 +119,6 @@ func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Write
 		}
 		// Use converted SQL for both parsing and the generated const (pgx needs $N)
 		sqlForConst := sqlForParsing
-
-		// Validate query against the live DB
-		if err := c.prepareQuery(ctx, sqlForParsing, query.name, i); err != nil {
-			return fmt.Errorf("query %q: %w", query.name, err)
-		}
 
 		parsedSQL, err := postgresparser.ParseSQLStrict(sqlForParsing)
 		if err != nil {
@@ -261,7 +256,7 @@ func (c *cli) generateCode(ctx context.Context, queries []Query, output io.Write
 	return nil
 }
 
-func (c *cli) generateExec(generatedFile *gen.File, query Query, parsedSQL *postgresparser.ParsedQuery, sqlForConst string, namedParams []string, std bool) error {
+func (c *cli) generateExec(generatedFile *gen.File, query query, parsedSQL *postgresparser.ParsedQuery, sqlForConst string, namedParams []string, std bool) error {
 	hasReturning := len(parsedSQL.Returning) > 0
 
 	if !hasReturning && query.t != "exec" && query.t != "execresult" {
