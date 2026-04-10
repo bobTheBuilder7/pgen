@@ -24,7 +24,7 @@ type cli struct {
 	db        *sql.DB
 }
 
-func run(ctx context.Context, std bool) error {
+func run(ctx context.Context, std bool, debug bool) error {
 	db, err := sql.Open("pglite", ":memory:")
 	if err != nil {
 		return errors.Join(err, errors.New("pglite db failed"))
@@ -96,11 +96,16 @@ func run(ctx context.Context, std bool) error {
 			}
 		}
 
-		out, err := os.Create(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)))
-		if err != nil {
-			return err
+		var out *os.File
+		if debug {
+			out = os.Stdout
+		} else {
+			out, err = os.Create(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)))
+			if err != nil {
+				return err
+			}
+			defer out.Close()
 		}
-		defer out.Close()
 
 		err = c.generateCode(ctx, queries, out, std)
 		if err != nil {
@@ -108,11 +113,16 @@ func run(ctx context.Context, std bool) error {
 		}
 	}
 
-	baseFile, err := os.Create("./db/db.go")
-	if err != nil {
-		return err
+	var baseFile *os.File
+	if debug {
+		baseFile = os.Stdout
+	} else {
+		baseFile, err = os.Create("./db/db.go")
+		if err != nil {
+			return err
+		}
+		defer baseFile.Close()
 	}
-	defer baseFile.Close()
 
 	err = generateBaseFile(baseFile, std)
 	if err != nil {
