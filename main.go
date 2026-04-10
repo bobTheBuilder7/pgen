@@ -7,7 +7,7 @@ import (
 )
 
 const dbDirectory = "db"
-const queriesDirectory = "query"
+const queriesDirectory = "queries"
 const migrationsDirectory = "migrations"
 const sqlConstSuffix = "SQL"
 

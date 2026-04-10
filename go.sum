@@ -14,8 +14,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/tetratelabs/wazero v1.8.2 h1:yIgLR/b2bN31bjxwXHD8a3d+BogigR952csSDdLYEv4=
 github.com/tetratelabs/wazero v1.8.2/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
-github.com/valkdb/postgresparser v1.1.7 h1:bgm9qKmVfcT/TvXXhBUv2R95+TrQHp5OXc0khadi6e8=
-github.com/valkdb/postgresparser v1.1.7/go.mod h1:ZLdOJbyhChgvx3QpbYKR8VPpUMVG3pHNv+2pS8T2uXQ=
+github.com/valkdb/postgresparser v1.1.9 h1:nk95NhZyTiT/zOx678/GBSVlppYhsFSdFjhUlk8kogQ=
+github.com/valkdb/postgresparser v1.1.9/go.mod h1:ZLdOJbyhChgvx3QpbYKR8VPpUMVG3pHNv+2pS8T2uXQ=
 golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa h1:Zt3DZoOFFYkKhDT3v7Lm9FDMEV06GpzjG2jrqW+QTE0=
 golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa/go.mod h1:K79w1Vqn7PoiZn+TkNpx3BUWUQksGO3JcVX6qIjytmA=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=

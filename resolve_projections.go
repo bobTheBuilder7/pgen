@@ -15,7 +15,7 @@ var aggregationRegex = regexp.MustCompile(`(?i)^(\w+)\((.+)\)$`)
 // resolveProjections resolves the Go struct fields and scan field references
 // from the SELECT column projections. Returns the struct fields for code generation
 // and the scan fields (e.g. "&i.Id") for row.Scan().
-func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables []postgresparser.TableRef) ([]gen.Field, []string, error) {
+func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables []postgresparser.TableRef, ctes []postgresparser.CTE) ([]gen.Field, []string, error) {
 	var structFields []gen.Field
 	var scanFields []string
 
@@ -29,7 +29,7 @@ func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables [
 			return nil, nil, fmt.Errorf("aggregation %q requires an alias (e.g. ... AS my_name)", expr)
 		}
 
-		goType, err := c.resolveColumnGoType(col, tables)
+		goType, err := c.resolveColumnGoType(col, tables, ctes)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -52,13 +52,13 @@ func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables [
 
 // resolveColumnGoType resolves the Go type for a SELECT projection column.
 // It handles table-qualified columns (e.g. u.id), string literals (e.g. 'foo'),
-// and aggregation functions (COUNT, SUM, COALESCE).
-func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []postgresparser.TableRef) (string, error) {
+// CTE-aliased columns (e.g. cte_name.col), and aggregation functions (COUNT, SUM, COALESCE).
+func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []postgresparser.TableRef, ctes []postgresparser.CTE) (string, error) {
 	expr := strings.TrimSpace(col.Expression)
 
 	// Aggregation function (not a subquery — those start with '(')
 	if strings.Contains(expr, "(") && !strings.HasPrefix(expr, "(") {
-		pgType, nullable, err := c.resolveAggregationType(expr, tables)
+		pgType, nullable, err := c.resolveAggregationType(expr, tables, ctes)
 		if err != nil {
 			return "", err
 		}
@@ -96,11 +96,20 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 		return "", fmt.Errorf("could not resolve table for column %q", expr)
 	}
 
-	// Look up schema columns
-	ddlColumns, ok := c.tablesCol.Load(tableName)
-	if !ok {
-		return "", fmt.Errorf("table %s not found in schema", tableName)
+	// Check if the table is a CTE — resolve through the CTE's projected columns
+	for _, cte := range ctes {
+		if cte.Name == tableName {
+			for _, cteCol := range cte.ParsedQuery.Columns {
+				if cteOutputColName(cteCol) == colName {
+					return c.resolveColumnGoType(cteCol, cte.ParsedQuery.Tables, cte.ParsedQuery.CTEs)
+				}
+			}
+			return "", fmt.Errorf("column %q not found in CTE %q", colName, tableName)
+		}
 	}
+
+	// Look up schema columns
+	ddlColumns, _ := c.tablesCol.Load(tableName)
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
 			nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, tables)
@@ -111,10 +120,23 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 	return "", fmt.Errorf("column %q not found in table %q", colName, tableName)
 }
 
+// cteOutputColName returns the output name of a CTE projected column.
+// Uses the alias if present, otherwise the last segment of the expression after ".".
+func cteOutputColName(col postgresparser.SelectColumn) string {
+	if col.Alias != "" {
+		return col.Alias
+	}
+	expr := col.Expression
+	if i := strings.LastIndex(expr, "."); i >= 0 {
+		return expr[i+1:]
+	}
+	return expr
+}
+
 // resolveAggregationType resolves the PG type and nullability for an aggregation
 // function expression. Supports COUNT (always int64, never null), SUM (column
 // type, always nullable), and COALESCE (inner type, forced non-nullable).
-func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableRef) (pgType string, nullable bool, err error) {
+func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableRef, ctes []postgresparser.CTE) (pgType string, nullable bool, err error) {
 	m := aggregationRegex.FindStringSubmatch(expr)
 	if m == nil {
 		return "", false, fmt.Errorf("unsupported expression %q: only COUNT, SUM, and COALESCE are supported", expr)
@@ -127,7 +149,7 @@ func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableR
 	case "COUNT":
 		return "int8", false, nil
 	case "SUM":
-		pgType, err := c.resolveSimpleColumnType(inner, tables)
+		pgType, err := c.resolveSimpleColumnType(inner, tables, ctes)
 		if err != nil {
 			return "", false, fmt.Errorf("SUM: %w", err)
 		}
@@ -135,7 +157,7 @@ func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableR
 	case "AVG":
 		return "float8", true, nil
 	case "MIN", "MAX":
-		pgType, err := c.resolveSimpleColumnType(inner, tables)
+		pgType, err := c.resolveSimpleColumnType(inner, tables, ctes)
 		if err != nil {
 			return "", false, fmt.Errorf("%s: %w", fn, err)
 		}
@@ -145,7 +167,7 @@ func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableR
 		if len(args) == 0 {
 			return "", false, fmt.Errorf("COALESCE requires at least one argument")
 		}
-		pgType, _, err := c.resolveAggregationType(strings.TrimSpace(args[0]), tables)
+		pgType, _, err := c.resolveAggregationType(strings.TrimSpace(args[0]), tables, ctes)
 		if err != nil {
 			return "", false, fmt.Errorf("COALESCE: %w", err)
 		}
@@ -157,7 +179,7 @@ func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableR
 
 // resolveSimpleColumnType resolves a table.column or alias.column expression
 // to its raw PostgreSQL type string (e.g. "smallint"), without Go mapping.
-func (c *cli) resolveSimpleColumnType(expr string, tables []postgresparser.TableRef) (string, error) {
+func (c *cli) resolveSimpleColumnType(expr string, tables []postgresparser.TableRef, ctes []postgresparser.CTE) (string, error) {
 	expr = strings.TrimSpace(expr)
 	var tableAlias, colName string
 	if parts := strings.SplitN(expr, ".", 2); len(parts) == 2 {
@@ -183,10 +205,19 @@ func (c *cli) resolveSimpleColumnType(expr string, tables []postgresparser.Table
 		return "", fmt.Errorf("could not resolve table for column %q", expr)
 	}
 
-	ddlColumns, ok := c.tablesCol.Load(tableName)
-	if !ok {
-		return "", fmt.Errorf("table %s not found in schema", tableName)
+	// Check if the table is a CTE — resolve through the CTE's projected columns
+	for _, cte := range ctes {
+		if cte.Name == tableName {
+			for _, cteCol := range cte.ParsedQuery.Columns {
+				if cteOutputColName(cteCol) == colName {
+					return c.resolveSimpleColumnType(cteCol.Expression, cte.ParsedQuery.Tables, cte.ParsedQuery.CTEs)
+				}
+			}
+			return "", fmt.Errorf("column %q not found in CTE %q", colName, tableName)
+		}
 	}
+
+	ddlColumns, _ := c.tablesCol.Load(tableName)
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
 			return ddlCol.Type, nil

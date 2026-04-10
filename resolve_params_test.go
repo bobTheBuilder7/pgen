@@ -961,3 +961,70 @@ func TestResolveParams_NamedLimitAndOffsetParams(t *testing.T) {
 	assert.Equal(t, namedParams, []string{"lim", "off"})
 	assert.Equal(t, types, []string{"int64", "int64"})
 }
+
+// CTE param tests
+
+func TestResolveParams_CTEFilterParam(t *testing.T) {
+	t.Parallel()
+	// $1 is inside the CTE's WHERE clause — not in the outer query's ColumnUsage
+	parsedSQL, err := postgresparser.ParseSQLStrict(`
+WITH active_users AS (
+    SELECT users.id, users.name
+    FROM users
+    WHERE users.active = $1
+)
+SELECT active_users.id, active_users.name
+FROM active_users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"active"})
+	assert.Equal(t, types, []string{"pgtype.Bool"})
+}
+
+func TestResolveParams_CTEMultipleParams(t *testing.T) {
+	t.Parallel()
+	// $1 and $2 both inside a single CTE's WHERE clause
+	parsedSQL, err := postgresparser.ParseSQLStrict(`
+WITH filtered AS (
+    SELECT users.id, users.name
+    FROM users
+    WHERE users.active = $1 AND users.age > $2
+)
+SELECT filtered.id, filtered.name
+FROM filtered;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"active", "age"})
+	assert.Equal(t, types, []string{"pgtype.Bool", "pgtype.Int2"})
+}
+
+func TestResolveParams_CTEFilterAndOuterParam(t *testing.T) {
+	t.Parallel()
+	// $1 is inside CTE WHERE, $2 is on the outer query's JOIN-filtered column
+	parsedSQL, err := postgresparser.ParseSQLStrict(`
+WITH recent_posts AS (
+    SELECT posts.id, posts.title, posts.user_id
+    FROM posts
+    WHERE posts.published = $1
+)
+SELECT recent_posts.title, users.name
+FROM recent_posts
+JOIN users ON users.id = recent_posts.user_id
+WHERE users.id = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"published", "id"})
+	assert.Equal(t, types, []string{"bool", "int64"})
+}

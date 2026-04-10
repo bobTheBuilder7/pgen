@@ -152,7 +152,7 @@ func (c *cli) generateCode(_ context.Context, queries []query, output io.Writer,
 
 		switch command := parsedSQL.Command; command {
 		case postgresparser.QueryCommandSelect:
-			structFields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+			structFields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 			if err != nil {
 				return err
 			}

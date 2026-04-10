@@ -14,6 +14,38 @@ type subqueryParamInfo struct {
 	tables []postgresparser.TableRef
 }
 
+// buildCTEParamMap scans CTEs for $N references in filter ColumnUsage entries
+// and returns a map of parameter position → CTE column usage info.
+// CTEs can contain WHERE clauses with parameters that appear in the top-level
+// Parameters slice but have no matching top-level filter ColumnUsage.
+func buildCTEParamMap(ctes []postgresparser.CTE) map[int]subqueryParamInfo {
+	result := make(map[int]subqueryParamInfo)
+	for _, cte := range ctes {
+		if cte.ParsedQuery == nil {
+			continue
+		}
+		filters := filterColumns(cte.ParsedQuery.ColumnUsage, postgresparser.ColumnUsageTypeFilter)
+		for _, filter := range filters {
+			paramPos := extractParamPosition(filter.Context)
+			if paramPos > 0 {
+				if _, exists := result[paramPos]; !exists {
+					result[paramPos] = subqueryParamInfo{
+						usage:  filter,
+						tables: cte.ParsedQuery.Tables,
+					}
+				}
+			}
+		}
+		// Recurse into nested CTEs
+		for pos, info := range buildCTEParamMap(cte.ParsedQuery.CTEs) {
+			if _, exists := result[pos]; !exists {
+				result[pos] = info
+			}
+		}
+	}
+	return result
+}
+
 // buildSubqueryParamMap scans subqueries for $N references and returns a map
 // of parameter position → subquery column usage info.
 // Each subquery's filter-type ColumnUsage entries have a Context field (e.g.
@@ -70,8 +102,9 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 		return c.resolveInsertParams(parsedSQL)
 	}
 
-	// Build subquery param map to identify params that belong to subqueries
+	// Build subquery and CTE param maps to identify params inside subqueries/CTEs
 	subqMap := buildSubqueryParamMap(parsedSQL.Subqueries)
+	cteMap := buildCTEParamMap(parsedSQL.CTEs)
 
 	// Build top-level usages, filtering out "phantom" filter entries
 	// that correspond to IN/NOT IN subquery clauses.
@@ -122,6 +155,17 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 			name, goType, err := c.resolveParamFromUsage(sqInfo.usage, sqInfo.tables)
 			if err != nil {
 				return nil, nil, fmt.Errorf("subquery parameter $%d: %w", param.Position, err)
+			}
+			names = append(names, name)
+			types = append(types, goType)
+			continue
+		}
+
+		// Check if this param belongs to a CTE
+		if cteInfo, ok := cteMap[param.Position]; ok {
+			name, goType, err := c.resolveParamFromUsage(cteInfo.usage, cteInfo.tables)
+			if err != nil {
+				return nil, nil, fmt.Errorf("CTE parameter $%d: %w", param.Position, err)
 			}
 			names = append(names, name)
 			types = append(types, goType)

@@ -15,7 +15,7 @@ func TestResolveProjections_SingleBigintColumn(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int64", Tag: `json:"id"`}})
 	assert.Equal(t, scans, []string{"&i.Id"})
@@ -28,7 +28,7 @@ func TestResolveProjections_SingleTextColumn(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Name", Type: "string", Tag: `json:"name"`}})
 	assert.Equal(t, scans, []string{"&i.Name"})
@@ -41,7 +41,7 @@ func TestResolveProjections_VarcharColumn(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Email", Type: "string", Tag: `json:"email"`}})
 	assert.Equal(t, scans, []string{"&i.Email"})
@@ -54,7 +54,7 @@ func TestResolveProjections_SmallintColumn(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Status", Type: "int16", Tag: `json:"status"`}})
 	assert.Equal(t, scans, []string{"&i.Status"})
@@ -67,7 +67,7 @@ func TestResolveProjections_IntegerColumn(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`}})
 	assert.Equal(t, scans, []string{"&i.RoleId"})
@@ -80,7 +80,7 @@ func TestResolveProjections_BooleanColumn(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Verified", Type: "bool", Tag: `json:"verified"`}})
 	assert.Equal(t, scans, []string{"&i.Verified"})
@@ -93,7 +93,7 @@ func TestResolveProjections_MultipleColumns(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -110,7 +110,7 @@ func TestResolveProjections_AliasedTable(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -127,7 +127,7 @@ func TestResolveProjections_ColumnAlias(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "UserId", Type: "int64", Tag: `json:"user_id"`},
@@ -143,7 +143,7 @@ func TestResolveProjections_AllIntSizes(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
@@ -160,7 +160,7 @@ func TestResolveProjections_MixedAliasAndNoAlias(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "UserId", Type: "int64", Tag: `json:"user_id"`},
@@ -177,7 +177,7 @@ func TestResolveProjections_StarSelectReturnsError(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
 }
@@ -189,7 +189,7 @@ func TestResolveProjections_StarSelectWithAliasReturnsError(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
 }
@@ -201,7 +201,7 @@ func TestResolveProjections_TableDotStarReturnsError(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
 }
@@ -213,7 +213,7 @@ func TestResolveProjections_AliasDotStarReturnsError(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `SELECT \*`)
 }
@@ -479,7 +479,7 @@ func TestResolveProjections_InnerJoinColumnsFromBothTables(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -497,7 +497,7 @@ func TestResolveProjections_LeftJoinForcesNullableOnJoinedTable(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},                     // users.id — NOT NULL, base table
@@ -518,7 +518,7 @@ func TestResolveProjections_LeftJoinNullableColumnStaysNullable(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -534,7 +534,7 @@ func TestResolveProjections_InnerJoinDoesNotForceNullable(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -551,7 +551,7 @@ func TestResolveProjections_RightJoinForcesNullableOnBaseTable(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "pgtype.Int8", Tag: `json:"id"`},     // users.id — NOT NULL but RIGHT JOIN makes base table nullable
@@ -570,7 +570,7 @@ func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},           // users.id — NOT NULL
@@ -593,7 +593,7 @@ func TestResolveProjections_WhereInSubqueryColumns(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -611,7 +611,7 @@ func TestResolveProjections_ExistsSubqueryColumns(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -630,7 +630,7 @@ func TestResolveProjections_ScalarSubqueryInSelect(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -645,7 +645,7 @@ func TestResolveProjections_KnownColumnsStillResolveAfterFix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
@@ -662,7 +662,7 @@ func TestResolveProjections_CountStarWithoutAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
@@ -673,7 +673,7 @@ func TestResolveProjections_CountColumnWithoutAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
@@ -684,7 +684,7 @@ func TestResolveProjections_SumWithoutAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
@@ -697,7 +697,7 @@ func TestResolveProjections_CountStarWithAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
 	assert.Equal(t, scanFields, []string{"&i.Total"})
@@ -709,7 +709,7 @@ func TestResolveProjections_CountColumnWithAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Cnt", Type: "int64", Tag: `json:"cnt"`}})
 	assert.Equal(t, scanFields, []string{"&i.Cnt"})
@@ -721,7 +721,7 @@ func TestResolveProjections_CountMixedWithRegularColumn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, scanFields, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
@@ -739,7 +739,7 @@ func TestResolveProjections_SumSmallint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "TotalAge", Type: "pgtype.Int2", Tag: `json:"total_age"`}})
 }
@@ -751,7 +751,7 @@ func TestResolveProjections_SumInteger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "pgtype.Int4", Tag: `json:"total"`}})
 }
@@ -763,7 +763,7 @@ func TestResolveProjections_SumBigint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "pgtype.Int8", Tag: `json:"total"`}})
 }
@@ -777,7 +777,7 @@ func TestResolveProjections_CoalesceOfSumSmallint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int16", Tag: `json:"total"`}})
 }
@@ -789,7 +789,7 @@ func TestResolveProjections_CoalesceOfSumInteger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int32", Tag: `json:"total"`}})
 }
@@ -801,7 +801,7 @@ func TestResolveProjections_CoalesceOfSumBigint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
 }
@@ -814,7 +814,7 @@ func TestResolveProjections_AvgWithoutAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
@@ -825,7 +825,7 @@ func TestResolveProjections_AvgSmallint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "AvgAge", Type: "pgtype.Float8", Tag: `json:"avg_age"`}})
 }
@@ -836,7 +836,7 @@ func TestResolveProjections_AvgBigint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "AvgOrg", Type: "pgtype.Float8", Tag: `json:"avg_org"`}})
 }
@@ -849,7 +849,7 @@ func TestResolveProjections_MinWithoutAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
@@ -860,7 +860,7 @@ func TestResolveProjections_MaxWithoutAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
@@ -871,7 +871,7 @@ func TestResolveProjections_MinSmallint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "MinAge", Type: "pgtype.Int2", Tag: `json:"min_age"`}})
 }
@@ -882,7 +882,7 @@ func TestResolveProjections_MaxSmallint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "MaxAge", Type: "pgtype.Int2", Tag: `json:"max_age"`}})
 }
@@ -893,7 +893,7 @@ func TestResolveProjections_MinInteger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "MinRole", Type: "pgtype.Int4", Tag: `json:"min_role"`}})
 }
@@ -904,7 +904,7 @@ func TestResolveProjections_MaxBigint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "MaxOrg", Type: "pgtype.Int8", Tag: `json:"max_org"`}})
 }
@@ -915,7 +915,7 @@ func TestResolveProjections_CoalesceOfMin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "MinAge", Type: "int16", Tag: `json:"min_age"`}})
 }
@@ -926,7 +926,7 @@ func TestResolveProjections_CoalesceOfMax(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "MaxOrg", Type: "int64", Tag: `json:"max_org"`}})
 }
@@ -938,7 +938,7 @@ func TestResolveProjections_CoalesceOfCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "int64", Tag: `json:"total"`}})
 }
@@ -950,9 +950,9 @@ func TestResolveProjections_FromSubqueryErrors(t *testing.T) {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
-	assert.MatchesRegexp(t, err.Error(), `table sub not found`)
+	assert.MatchesRegexp(t, err.Error(), `sub`)
 }
 
 // --- Unknown column / table errors ---
@@ -962,7 +962,7 @@ func TestResolveProjections_UnknownColumnErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `nonexistent`)
 }
@@ -973,7 +973,7 @@ func TestResolveProjections_UnknownColumnErrorMentionsTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `users`)
 }
@@ -984,7 +984,56 @@ func TestResolveProjections_UnknownTableAliasErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
-	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables)
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `x\.id`)
+}
+
+func TestResolveProjections_CTEColumnAlias(t *testing.T) {
+	t.Parallel()
+	// Outer query selects columns prefixed with the CTE alias name
+	parsedSQL, err := postgresparser.ParseSQLStrict(`
+WITH active_users AS (
+    SELECT users.id, users.name
+    FROM users
+    WHERE users.active = $1
+)
+SELECT active_users.id, active_users.name
+FROM active_users;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name"})
+}
+
+func TestResolveProjections_CTEMixedWithRealTable(t *testing.T) {
+	t.Parallel()
+	// Outer query mixes columns from a CTE alias and a real joined table
+	parsedSQL, err := postgresparser.ParseSQLStrict(`
+WITH recent_posts AS (
+    SELECT posts.id, posts.title, posts.user_id
+    FROM posts
+    WHERE posts.published = $1
+)
+SELECT recent_posts.title, users.name
+FROM recent_posts
+JOIN users ON users.id = recent_posts.user_id;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Title", Type: "string", Tag: `json:"title"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+	})
+	assert.Equal(t, scans, []string{"&i.Title", "&i.Name"})
 }

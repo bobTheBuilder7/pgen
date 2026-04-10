@@ -1,5 +1,5 @@
 .DS_Store
 experiments/
 info.txt
-db/
+db/*.go
 pgen
