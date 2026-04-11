@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 
 	testSharedCli = &cli{db: db}
 
-	files, err := os.ReadDir(filepath.Join(dbDirectory, migrationsDirectory))
+	files, err := os.ReadDir(filepath.Join("db", "migrations"))
 	if err != nil {
 		fmt.Printf("failed to read migrations: %v\n", err)
 		os.Exit(1)
@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 	}
 	sortMigrations(migrationNames)
 	for _, name := range migrationNames {
-		f, err := os.Open(filepath.Join(dbDirectory, migrationsDirectory, name))
+		f, err := os.Open(filepath.Join("db", "migrations", name))
 		if err != nil {
 			fmt.Printf("failed to open migration %s: %v\n", name, err)
 			os.Exit(1)

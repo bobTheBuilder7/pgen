@@ -20,11 +20,14 @@ type dbColumn struct {
 }
 
 type cli struct {
-	tablesCol syncmap.Map[string, []dbColumn]
-	db        *sql.DB
+	tablesCol          syncmap.Map[string, []dbColumn]
+	db                 *sql.DB
+	dbDirectory        string
+	queriesDirectory   string
+	migrationsDirectory string
 }
 
-func run(ctx context.Context, std bool, debug bool) error {
+func run(ctx context.Context, std bool, debug bool, dbDirectory string, queriesDirectory string, migrationsDirectory string) error {
 	db, err := sql.Open("pglite", ":memory:")
 	if err != nil {
 		return errors.Join(err, errors.New("pglite db failed"))
@@ -35,9 +38,14 @@ func run(ctx context.Context, std bool, debug bool) error {
 	db.SetConnMaxIdleTime(0)
 	db.SetConnMaxLifetime(0)
 
-	c := &cli{db: db}
+	c := &cli{
+		db:                  db,
+		dbDirectory:         dbDirectory,
+		queriesDirectory:    queriesDirectory,
+		migrationsDirectory: migrationsDirectory,
+	}
 
-	files, err := os.ReadDir(filepath.Join(dbDirectory, migrationsDirectory))
+	files, err := os.ReadDir(filepath.Join(c.dbDirectory, c.migrationsDirectory))
 	if err != nil {
 		return err
 	}
@@ -50,7 +58,7 @@ func run(ctx context.Context, std bool, debug bool) error {
 	sortMigrations(migrationNames)
 
 	for _, name := range migrationNames {
-		f, err := os.Open(filepath.Join(dbDirectory, migrationsDirectory, name))
+		f, err := os.Open(filepath.Join(c.dbDirectory, c.migrationsDirectory, name))
 		if err != nil {
 			return err
 		}
@@ -65,7 +73,7 @@ func run(ctx context.Context, std bool, debug bool) error {
 		return err
 	}
 
-	queryFiles, err := os.ReadDir(filepath.Join(dbDirectory, queriesDirectory))
+	queryFiles, err := os.ReadDir(filepath.Join(c.dbDirectory, c.queriesDirectory))
 	if err != nil {
 		return err
 	}
@@ -77,7 +85,7 @@ func run(ctx context.Context, std bool, debug bool) error {
 			return fmt.Errorf("%s shouldn't be in queries directory", filename)
 		}
 
-		f, err := os.Open(filepath.Join(dbDirectory, queriesDirectory, filename))
+		f, err := os.Open(filepath.Join(c.dbDirectory, c.queriesDirectory, filename))
 		if err != nil {
 			return err
 		}
@@ -110,7 +118,7 @@ func run(ctx context.Context, std bool, debug bool) error {
 		if debug {
 			out = os.Stdout
 		} else {
-			out, err = os.Create(filepath.Join(dbDirectory, strings.Replace(filename, ".sql", ".go", 1)))
+			out, err = os.Create(filepath.Join(c.dbDirectory, strings.Replace(filename, ".sql", ".go", 1)))
 			if err != nil {
 				return err
 			}
@@ -127,7 +135,7 @@ func run(ctx context.Context, std bool, debug bool) error {
 	if debug {
 		baseFile = os.Stdout
 	} else {
-		baseFile, err = os.Create("./db/db.go")
+		baseFile, err = os.Create(filepath.Join(c.dbDirectory, "db.go"))
 		if err != nil {
 			return err
 		}
