@@ -280,3 +280,111 @@ func TestGenerateCode_ValidQueryTypesSucceed(t *testing.T) {
 		assert.Nil(t, err)
 	}
 }
+
+// --- RETURNING ---
+
+func TestGenerateCode_InsertReturningOneUsesQueryRow(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryRow[^C]`)
+}
+
+func TestGenerateCode_InsertReturningManyUsesQuery(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "many",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `\.Query\b`)
+}
+
+func TestGenerateCode_StdModeInsertReturningOneUsesQueryRowContext(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, true)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryRowContext`)
+}
+
+func TestGenerateCode_StdModeInsertReturningManyUsesQueryContext(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "many",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, true)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryContext`)
+}
+
+func TestGenerateCode_UpdateReturningOneSucceeds(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "UpdateUserName", "one",
+		`UPDATE users SET name = $1 WHERE users.id = $2 RETURNING id, name;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryRow[^C]`)
+}
+
+func TestGenerateCode_DeleteReturningOneSucceeds(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "DeleteUser", "one",
+		`DELETE FROM users WHERE users.id = $1 RETURNING id, name;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `QueryRow[^C]`)
+}
+
+func TestGenerateCode_InsertReturningGeneratesRowStruct(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `CreateUserRow`)
+}
+
+func TestGenerateCode_InsertReturningGeneratesSQLConst(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `CreateUserSQL`)
+}
+
+func TestGenerateCode_InsertReturningGeneratesScanCall(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `\.Scan\(`)
+}
+
+// --- RETURNING type mismatch errors ---
+
+func TestGenerateCode_InsertReturningWithExecTypeReturnsError(t *testing.T) {
+	t.Parallel()
+	err := generateQuery(t, testSharedCli, "CreateUser", "exec",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `RETURNING`)
+}
+
+func TestGenerateCode_InsertReturningWithExecResultTypeReturnsError(t *testing.T) {
+	t.Parallel()
+	err := generateQuery(t, testSharedCli, "CreateUser", "execresult",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `RETURNING`)
+}
+
+func TestGenerateCode_InsertWithoutReturningWithOneTypeReturnsError(t *testing.T) {
+	t.Parallel()
+	err := generateQuery(t, testSharedCli, "CreateUser", "one",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5);`, false)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `one`)
+}
+
+func TestGenerateCode_InsertWithoutReturningWithManyTypeReturnsError(t *testing.T) {
+	t.Parallel()
+	err := generateQuery(t, testSharedCli, "CreateUser", "many",
+		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5);`, false)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `many`)
+}
