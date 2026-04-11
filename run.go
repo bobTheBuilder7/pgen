@@ -96,6 +96,16 @@ func run(ctx context.Context, std bool, debug bool) error {
 			}
 		}
 
+		var resolved []resolvedQuery
+		for _, q := range queries {
+			rq, err := c.resolveQuery(q)
+			if err != nil {
+				return err
+			}
+
+			resolved = append(resolved, rq)
+		}
+
 		var out *os.File
 		if debug {
 			out = os.Stdout
@@ -107,7 +117,7 @@ func run(ctx context.Context, std bool, debug bool) error {
 			defer out.Close()
 		}
 
-		err = c.generateCode(ctx, queries, out, std)
+		err = c.generateCode(ctx, resolved, out, std)
 		if err != nil {
 			return err
 		}

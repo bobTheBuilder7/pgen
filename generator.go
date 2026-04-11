@@ -2,364 +2,114 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	"github.com/bobTheBuilder7/gen"
-	"github.com/valkdb/postgresparser"
 )
 
-var namedParamRegex = regexp.MustCompile(`@(\w+)`)
-var positionalParamRegex = regexp.MustCompile(`\$\d+`)
+func (c *cli) generateCode(_ context.Context, queries []resolvedQuery, output io.Writer, std bool) error {
+	f := gen.NewFile("db")
 
-// convertNamedParams detects @name style parameters in SQL and converts them
-// to positional $N parameters. Returns the converted SQL and the ordered list
-// of parameter names. If no named params are found, returns the original SQL
-// with nil paramNames. Errors if both @name and $N styles are mixed.
-func convertNamedParams(sql string) (string, []string, error) {
-	hasNamed := namedParamRegex.MatchString(sql)
-	hasPositional := positionalParamRegex.MatchString(sql)
-
-	if hasNamed && hasPositional {
-		return "", nil, fmt.Errorf("cannot mix named (@name) and positional ($N) parameters in the same query")
-	}
-
-	if !hasNamed {
-		return sql, nil, nil
-	}
-
-	nameToPos := make(map[string]int)
-	var paramNames []string
-	converted := namedParamRegex.ReplaceAllStringFunc(sql, func(match string) string {
-		name := match[1:] // strip @
-		if pos, seen := nameToPos[name]; seen {
-			return fmt.Sprintf("$%d", pos)
-		}
-		pos := len(paramNames) + 1
-		nameToPos[name] = pos
-		paramNames = append(paramNames, name)
-		return fmt.Sprintf("$%d", pos)
-	})
-
-	return converted, paramNames, nil
-}
-
-func pgTypeToGoType(pgType string, nullable bool) string {
-	switch strings.ToLower(pgType) {
-	case "bigserial", "bigint", "int8":
-		if nullable {
-			return "pgtype.Int8"
-		}
-		return "int64"
-	case "serial", "integer", "int", "int4":
-		if nullable {
-			return "pgtype.Int4"
-		}
-		return "int32"
-	case "smallserial", "smallint", "int2":
-		if nullable {
-			return "pgtype.Int2"
-		}
-		return "int16"
-	case "boolean", "bool":
-		if nullable {
-			return "pgtype.Bool"
-		}
-		return "bool"
-	case "real", "float4":
-		if nullable {
-			return "pgtype.Float4"
-		}
-		return "float32"
-	case "double precision", "float8":
-		if nullable {
-			return "pgtype.Float8"
-		}
-		return "float64"
-	case "text", "varchar", "character varying", "char", "character":
-		if nullable {
-			return "pgtype.Text"
-		}
-		return "string"
-	case "uuid":
-		if nullable {
-			return "pgtype.UUID"
-		}
-		return "string"
-	default:
-		return "string"
-	}
-}
-
-func (c *cli) generateCode(_ context.Context, queries []query, output io.Writer, std bool) error {
-	generatedFile := gen.NewFile("db")
-
-	generatedFile.AddBlock(gen.Import("", "context"))
+	f.AddBlock(gen.Import("", "context"))
 	if std {
-		generatedFile.AddBlock(gen.Import("", "database/sql"))
+		f.AddBlock(gen.Import("", "database/sql"))
 	} else {
-		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
-		generatedFile.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
+		f.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
+		f.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 	}
 
-	for _, query := range queries {
-		switch query.t {
-		case "one", "many", "exec", "execresult":
-		default:
-			return fmt.Errorf("query %q: unknown query type %q, must be one of: one, many, exec, execresult", query.name, query.t)
-		}
-
-		// Convert @name params to $N if present
-		sqlForParsing, namedParams, err := convertNamedParams(query.sql)
-		if err != nil {
-			return err
-		}
-		// Use converted SQL for both parsing and the generated const (pgx needs $N)
-		sqlForConst := sqlForParsing
-
-		parsedSQL, err := postgresparser.ParseSQLStrict(sqlForParsing)
-		if err != nil {
-			return err
-		}
-
-		// Validate that positional parameters are sequential with no gaps.
-		// PostgreSQL requires $1, $2, $3... — skipping (e.g. $1 and $31) is a runtime error.
-		seen := make(map[int]bool)
-		for _, p := range parsedSQL.Parameters {
-			seen[p.Position] = true
-		}
-		for i := 1; i <= len(seen); i++ {
-			if !seen[i] {
-				return fmt.Errorf("query %q: parameter positions are not sequential (missing $%d)", query.name, i)
-			}
-		}
-
-		if parsedSQL.Command == postgresparser.QueryCommandUpdate || parsedSQL.Command == postgresparser.QueryCommandDelete {
-			hasFilter := false
-			for _, cu := range parsedSQL.ColumnUsage {
-				if cu.UsageType == postgresparser.ColumnUsageTypeFilter {
-					hasFilter = true
-					break
-				}
-			}
-			if !hasFilter {
-				return fmt.Errorf("query %q: %s without WHERE clause is not allowed", query.name, parsedSQL.Command)
-			}
-		}
-
-		switch command := parsedSQL.Command; command {
-		case postgresparser.QueryCommandSelect:
-			structFields, scanFields, err := c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
-			if err != nil {
-				return err
-			}
-
-			rowStructName := query.name + "Row"
-
-			// Resolve function parameters from WHERE clause
-			paramNames, paramTypes, err := c.resolveParams(parsedSQL)
-			if err != nil {
-				return err
-			}
-
-			// Override param names if using named params
-			if namedParams != nil {
-				paramNames = namedParams
-			}
-
-			// Build function signature params
-			funcParams := "ctx context.Context"
-			var callArgs []fmt.Stringer
-			callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+sqlConstSuffix))
-			for i, name := range paramNames {
-				funcParams += ", " + name + " " + paramTypes[i]
-				callArgs = append(callArgs, gen.Arg(name))
-			}
-
-			// Generate struct
-			generatedFile.AddBlock(gen.Struct(rowStructName, structFields...))
-
-			// Generate SQL const
-			generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(sqlForConst)))
-
-			switch query.t {
-			case "one":
-				queryRowMethod := "q.db.QueryRow"
-				if std {
-					queryRowMethod = "q.db.QueryRowContext"
-				}
-				generatedFile.AddBlock(
-					gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
-						gen.Call("row", queryRowMethod, callArgs...),
-						gen.Line("var i "+rowStructName),
-						gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
-						gen.Line("return i, err"),
-					),
-				)
-			case "many":
-				queryManyMethod := "q.db.Query"
-				if std {
-					queryManyMethod = "q.db.QueryContext"
-				}
-				body := []fmt.Stringer{
-					gen.Call("rows, err", queryManyMethod, callArgs...),
-					gen.Line("if err != nil {"),
-					gen.Line("return nil, err"),
-					gen.Line("}"),
-					gen.Line("defer rows.Close()"),
-					gen.Line("var items []" + rowStructName),
-					gen.Line("for rows.Next() {"),
-					gen.Line("var i " + rowStructName),
-				}
-				body = append(body,
-					gen.Line("if err := rows.Scan("+strings.Join(scanFields, ", ")+"); err != nil {"),
-					gen.Line("return nil, err"),
-					gen.Line("}"),
-					gen.Line("items = append(items, i)"),
-					gen.Line("}"),
-					gen.Line("return items, rows.Err()"),
-				)
-				generatedFile.AddBlock(
-					gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
-				)
-			case "exec", "execresult":
-				return c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std)
-			default:
-				return fmt.Errorf("query type %s not supported for SELECT", query.t)
-			}
-
-		case postgresparser.QueryCommandInsert:
-			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std); err != nil {
-				return err
-			}
-		case postgresparser.QueryCommandUpdate:
-			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std); err != nil {
-				return err
-			}
-		case postgresparser.QueryCommandDelete:
-			if err := c.generateExec(generatedFile, query, parsedSQL, sqlForConst, namedParams, std); err != nil {
-				return err
-			}
-		default:
-			return errors.New("not implemented")
-		}
+	for _, rq := range queries {
+		emitQuery(f, rq, std)
 	}
 
-	_, err := generatedFile.WriteTo(output)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := f.WriteTo(output)
+	return err
 }
 
-func (c *cli) generateExec(generatedFile *gen.File, query query, parsedSQL *postgresparser.ParsedQuery, sqlForConst string, namedParams []string, std bool) error {
-	hasReturning := len(parsedSQL.Returning) > 0
-
-	if !hasReturning && query.t != "exec" && query.t != "execresult" {
-		return fmt.Errorf("query type %s not supported for %s without RETURNING", query.t, parsedSQL.Command)
-	}
-	if hasReturning && query.t != "one" && query.t != "many" {
-		return fmt.Errorf("query type %s not supported for %s with RETURNING (use :one or :many)", query.t, parsedSQL.Command)
-	}
-
-	paramNames, paramTypes, err := c.resolveParams(parsedSQL)
-	if err != nil {
-		return errors.Join(err, errors.New("generateExec failed"))
-	}
-
-	// Override param names if using named params
-	if namedParams != nil {
-		paramNames = namedParams
-	}
+// emitQuery writes Go code for a single resolved query into f.
+// It has no knowledge of SQL, schema, or type resolution.
+func emitQuery(f *gen.File, rq resolvedQuery, std bool) {
+	f.AddBlock(gen.Const(rq.name+sqlConstSuffix, gen.String(rq.sqlConst)))
 
 	funcParams := "ctx context.Context"
 	var callArgs []fmt.Stringer
-	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(query.name+sqlConstSuffix))
-	for i, name := range paramNames {
-		funcParams += ", " + name + " " + paramTypes[i]
+	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(rq.name+sqlConstSuffix))
+	for i, name := range rq.paramNames {
+		funcParams += ", " + name + " " + rq.paramTypes[i]
 		callArgs = append(callArgs, gen.Arg(name))
 	}
 
-	generatedFile.AddBlock(gen.Const(query.name+sqlConstSuffix, gen.String(sqlForConst)))
+	rowStructName := rq.name + "Row"
 
-	if hasReturning {
-		structFields, scanFields, err := c.resolveReturning(parsedSQL)
-		if err != nil {
-			return err
-		}
-
-		rowStructName := query.name + "Row"
-		generatedFile.AddBlock(gen.Struct(rowStructName, structFields...))
-
+	switch rq.t {
+	case "one":
 		queryRowMethod := "q.db.QueryRow"
-		queryManyMethod := "q.db.Query"
 		if std {
 			queryRowMethod = "q.db.QueryRowContext"
+		}
+		f.AddBlock(gen.Struct(rowStructName, rq.rowFields...))
+		f.AddBlock(
+			gen.MethodFunc("q *Queries", rq.name, funcParams, "("+rowStructName+", error)",
+				gen.Call("row", queryRowMethod, callArgs...),
+				gen.Line("var i "+rowStructName),
+				gen.Call("err", "row.Scan", stringersFromStrings(rq.scanFields)...),
+				gen.Line("return i, err"),
+			),
+		)
+
+	case "many":
+		queryManyMethod := "q.db.Query"
+		if std {
 			queryManyMethod = "q.db.QueryContext"
 		}
-		switch query.t {
-		case "one":
-			generatedFile.AddBlock(
-				gen.MethodFunc("q *Queries", query.name, funcParams, "("+rowStructName+", error)",
-					gen.Call("row", queryRowMethod, callArgs...),
-					gen.Line("var i "+rowStructName),
-					gen.Call("err", "row.Scan", stringersFromStrings(scanFields)...),
-					gen.Line("return i, err"),
-				),
-			)
-		case "many":
-			body := []fmt.Stringer{
-				gen.Call("rows, err", queryManyMethod, callArgs...),
-				gen.Line("if err != nil {"),
-				gen.Line("return nil, err"),
-				gen.Line("}"),
-				gen.Line("defer rows.Close()"),
-				gen.Line("var items []" + rowStructName),
-				gen.Line("for rows.Next() {"),
-				gen.Line("var i " + rowStructName),
-			}
-			body = append(body,
-				gen.Line("if err := rows.Scan("+strings.Join(scanFields, ", ")+"); err != nil {"),
-				gen.Line("return nil, err"),
-				gen.Line("}"),
-				gen.Line("items = append(items, i)"),
-				gen.Line("}"),
-				gen.Line("return items, rows.Err()"),
-			)
-			generatedFile.AddBlock(
-				gen.MethodFunc("q *Queries", query.name, funcParams, "([]"+rowStructName+", error)", body...),
-			)
+		body := []fmt.Stringer{
+			gen.Call("rows, err", queryManyMethod, callArgs...),
+			gen.Line("if err != nil {"),
+			gen.Line("return nil, err"),
+			gen.Line("}"),
+			gen.Line("defer rows.Close()"),
+			gen.Line("var items []" + rowStructName),
+			gen.Line("for rows.Next() {"),
+			gen.Line("var i " + rowStructName),
+			gen.Line("if err := rows.Scan(" + strings.Join(rq.scanFields, ", ") + "); err != nil {"),
+			gen.Line("return nil, err"),
+			gen.Line("}"),
+			gen.Line("items = append(items, i)"),
+			gen.Line("}"),
+			gen.Line("return items, rows.Err()"),
 		}
-		return nil
-	}
+		f.AddBlock(gen.Struct(rowStructName, rq.rowFields...))
+		f.AddBlock(
+			gen.MethodFunc("q *Queries", rq.name, funcParams, "([]"+rowStructName+", error)", body...),
+		)
 
-	execMethod := "q.db.Exec"
-	execResultType := "pgconn.CommandTag"
-	if std {
-		execMethod = "q.db.ExecContext"
-		execResultType = "sql.Result"
-	}
-	switch query.t {
 	case "exec":
-		generatedFile.AddBlock(
-			gen.MethodFunc("q *Queries", query.name, funcParams, "error",
+		execMethod := "q.db.Exec"
+		if std {
+			execMethod = "q.db.ExecContext"
+		}
+		f.AddBlock(
+			gen.MethodFunc("q *Queries", rq.name, funcParams, "error",
 				gen.Call("_, err", execMethod, callArgs...),
 				gen.Line("return err"),
 			),
 		)
+
 	case "execresult":
-		generatedFile.AddBlock(
-			gen.MethodFunc("q *Queries", query.name, funcParams, "("+execResultType+", error)",
+		execMethod := "q.db.Exec"
+		execResultType := "pgconn.CommandTag"
+		if std {
+			execMethod = "q.db.ExecContext"
+			execResultType = "sql.Result"
+		}
+		f.AddBlock(
+			gen.MethodFunc("q *Queries", rq.name, funcParams, "("+execResultType+", error)",
 				gen.Line("return "+execMethod+"("+buildCallArgsString(callArgs)+")"),
 			),
 		)
 	}
-
-	return nil
 }
 
 func buildCallArgsString(args []fmt.Stringer) string {
@@ -376,16 +126,4 @@ func stringersFromStrings(ss []string) []fmt.Stringer {
 		out[i] = gen.Arg(s)
 	}
 	return out
-}
-
-func filterColumns(columns []postgresparser.ColumnUsage, usage postgresparser.ColumnUsageType) []postgresparser.ColumnUsage {
-	var cols []postgresparser.ColumnUsage
-
-	for _, col := range columns {
-		if col.UsageType == usage {
-			cols = append(cols, col)
-		}
-	}
-
-	return cols
 }

@@ -284,3 +284,15 @@ func (c *cli) resolveInsertParams(parsedSQL *postgresparser.ParsedQuery) ([]stri
 
 	return names, types, nil
 }
+
+func filterColumns(columns []postgresparser.ColumnUsage, usage postgresparser.ColumnUsageType) []postgresparser.ColumnUsage {
+	var cols []postgresparser.ColumnUsage
+
+	for _, col := range columns {
+		if col.UsageType == usage {
+			cols = append(cols, col)
+		}
+	}
+
+	return cols
+}

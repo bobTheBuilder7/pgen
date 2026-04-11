@@ -10,15 +10,21 @@ import (
 
 func generateQuery(t *testing.T, c *cli, name, queryType, sql string, std bool) error {
 	t.Helper()
-	return c.generateCode(t.Context(), []query{{name: name, t: queryType, sql: sql}}, io.Discard, std)
+	rq, err := c.resolveQuery(query{name: name, t: queryType, sql: sql})
+	if err != nil {
+		return err
+	}
+	return c.generateCode(t.Context(), []resolvedQuery{rq}, io.Discard, std)
 }
 
 func generateQueryOutput(t *testing.T, c *cli, name, queryType, sql string, std bool) (string, error) {
 	t.Helper()
-
+	rq, err := c.resolveQuery(query{name: name, t: queryType, sql: sql})
+	if err != nil {
+		return "", err
+	}
 	buf := new(bytes.Buffer)
-	err := c.generateCode(t.Context(), []query{{name: name, t: queryType, sql: sql}}, buf, std)
-
+	err = c.generateCode(t.Context(), []resolvedQuery{rq}, buf, std)
 	return buf.String(), err
 }
 
