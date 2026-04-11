@@ -5,27 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	_ "github.com/bobTheBuilder7/gopglite"
 )
-
-const usersSchemaSQL = `CREATE TABLE users (
-	id BIGSERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
-	email VARCHAR(255) NOT NULL,
-	age SMALLINT,
-	status SMALLINT NOT NULL,
-	role_id INTEGER NOT NULL,
-	login_count INTEGER,
-	org_id BIGINT NOT NULL,
-	referrer_id BIGINT,
-	active BOOLEAN DEFAULT TRUE,
-	verified BOOLEAN NOT NULL DEFAULT FALSE
-);`
-
-const postsSchemaSQL = `CREATE TABLE posts (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, body TEXT, user_id BIGINT NOT NULL, published BOOLEAN NOT NULL DEFAULT FALSE);`
 
 var (
 	testSharedCli *cli
@@ -46,14 +31,30 @@ func TestMain(m *testing.M) {
 
 	testSharedCli = &cli{db: db}
 
-	if err := testSharedCli.runMigration(ctx, "users.up.sql", strings.NewReader(usersSchemaSQL)); err != nil {
-		fmt.Printf("failed to run users migration: %v\n", err)
+	files, err := os.ReadDir(filepath.Join(dbDirectory, migrationsDirectory))
+	if err != nil {
+		fmt.Printf("failed to read migrations: %v\n", err)
 		os.Exit(1)
 	}
-
-	if err := testSharedCli.runMigration(ctx, "posts.up.sql", strings.NewReader(postsSchemaSQL)); err != nil {
-		fmt.Printf("failed to run users migration: %v\n", err)
-		os.Exit(1)
+	var migrationNames []string
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".up.sql") {
+			migrationNames = append(migrationNames, file.Name())
+		}
+	}
+	sortMigrations(migrationNames)
+	for _, name := range migrationNames {
+		f, err := os.Open(filepath.Join(dbDirectory, migrationsDirectory, name))
+		if err != nil {
+			fmt.Printf("failed to open migration %s: %v\n", name, err)
+			os.Exit(1)
+		}
+		err = testSharedCli.runMigration(ctx, name, f)
+		f.Close()
+		if err != nil {
+			fmt.Printf("failed to run migration %s: %v\n", name, err)
+			os.Exit(1)
+		}
 	}
 
 	if err := testSharedCli.loadSchemaFromDB(ctx); err != nil {

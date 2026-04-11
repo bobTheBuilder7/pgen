@@ -16,44 +16,44 @@ func parseQueries(t *testing.T, sql string) ([]query, error) {
 func TestParseQuery_SingleQuery(t *testing.T) {
 	t.Parallel()
 	queries, err := parseQueries(t, `
--- name: GetUser :one
-SELECT users.id FROM users WHERE users.id = $1;
+-- name: GetMovie :one
+SELECT movies.id FROM movies WHERE movies.id = $1;
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 1)
-	assert.Equal(t, queries[0].name, "GetUser")
+	assert.Equal(t, queries[0].name, "GetMovie")
 	assert.Equal(t, queries[0].t, "one")
 }
 
 func TestParseQuery_MultipleQueries(t *testing.T) {
 	t.Parallel()
 	queries, err := parseQueries(t, `
--- name: GetUser :one
-SELECT users.id FROM users WHERE users.id = $1;
+-- name: GetMovie :one
+SELECT movies.id FROM movies WHERE movies.id = $1;
 
--- name: ListUsers :many
-SELECT users.id FROM users;
+-- name: ListMovies :many
+SELECT movies.id FROM movies;
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 2)
-	assert.Equal(t, queries[0].name, "GetUser")
-	assert.Equal(t, queries[1].name, "ListUsers")
+	assert.Equal(t, queries[0].name, "GetMovie")
+	assert.Equal(t, queries[1].name, "ListMovies")
 }
 
 func TestParseQuery_AllQueryTypes(t *testing.T) {
 	t.Parallel()
 	queries, err := parseQueries(t, `
--- name: GetUser :one
-SELECT users.id FROM users WHERE users.id = $1;
+-- name: GetMovie :one
+SELECT movies.id FROM movies WHERE movies.id = $1;
 
--- name: ListUsers :many
-SELECT users.id FROM users;
+-- name: ListMovies :many
+SELECT movies.id FROM movies;
 
--- name: DeleteUser :exec
-DELETE FROM users WHERE users.id = $1;
+-- name: DeleteMovie :exec
+DELETE FROM movies WHERE movies.id = $1;
 
--- name: CreateUser :execresult
-INSERT INTO users (name) VALUES ($1);
+-- name: CreateMovie :execresult
+INSERT INTO movies (name) VALUES ($1);
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 4)
@@ -66,34 +66,34 @@ INSERT INTO users (name) VALUES ($1);
 func TestParseQuery_SQLBodyCaptured(t *testing.T) {
 	t.Parallel()
 	queries, err := parseQueries(t, `
--- name: GetUser :one
-SELECT users.id FROM users WHERE users.id = $1;
+-- name: GetMovie :one
+SELECT movies.id FROM movies WHERE movies.id = $1;
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 1)
-	assert.Equal(t, queries[0].sql, `SELECT users.id FROM users WHERE users.id = $1;`)
+	assert.Equal(t, queries[0].sql, `SELECT movies.id FROM movies WHERE movies.id = $1;`)
 }
 
 func TestParseQuery_MultilineSQL(t *testing.T) {
 	t.Parallel()
 	queries, err := parseQueries(t, `
--- name: GetUser :one
-SELECT users.id
-FROM users
-WHERE users.id = $1;
+-- name: GetMovie :one
+SELECT movies.id
+FROM movies
+WHERE movies.id = $1;
 `)
 	assert.Nil(t, err)
 	assert.Equal(t, len(queries), 1)
-	assert.Equal(t, queries[0].sql, `SELECT users.id
-FROM users
-WHERE users.id = $1;`)
+	assert.Equal(t, queries[0].sql, `SELECT movies.id
+FROM movies
+WHERE movies.id = $1;`)
 }
 
 func TestParseQuery_InvalidHeaderReturnsError(t *testing.T) {
 	t.Parallel()
 	_, err := parseQueries(t, `
--- name: GetUser
-SELECT users.id FROM users WHERE users.id = $1;
+-- name: GetMovie
+SELECT movies.id FROM movies WHERE movies.id = $1;
 `)
 	assert.NotNil(t, err)
 }

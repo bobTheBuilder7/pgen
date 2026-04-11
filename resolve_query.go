@@ -186,6 +186,11 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 			return "pgtype.UUID"
 		}
 		return "string"
+	case "date":
+		if nullable {
+			return "pgtype.Date"
+		}
+		return "pgtype.Date"
 	default:
 		return "string"
 	}

@@ -31,42 +31,42 @@ func generateQueryOutput(t *testing.T, c *cli, name, queryType, sql string, std 
 // --- std mode method names ---
 func TestGenerateCode_StdModeSelectOneUsesQueryRowContext(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "GetUser", "one", `SELECT users.id FROM users WHERE users.id = $1;`, true)
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovie", "one", `SELECT movies.id FROM movies WHERE movies.id = $1;`, true)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryRowContext`)
 }
 
 func TestGenerateCode_StdModeSelectManyUsesQueryContext(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "ListUsers", "many", `SELECT users.id FROM users WHERE users.id = $1;`, true)
+	out, err := generateQueryOutput(t, testSharedCli, "ListMovies", "many", `SELECT movies.id FROM movies WHERE movies.id = $1;`, true)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryContext`)
 }
 
 func TestGenerateCode_StdModeExecUsesExecContext(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "DeleteUser", "exec", `DELETE FROM users WHERE users.id = $1;`, true)
+	out, err := generateQueryOutput(t, testSharedCli, "DeleteMovie", "exec", `DELETE FROM movies WHERE movies.id = $1;`, true)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `ExecContext`)
 }
 
 func TestGenerateCode_StdModeExecResultReturnsSQLResult(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "DeleteUser", "execresult", `DELETE FROM users WHERE users.id = $1;`, true)
+	out, err := generateQueryOutput(t, testSharedCli, "DeleteMovie", "execresult", `DELETE FROM movies WHERE movies.id = $1;`, true)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `sql\.Result`)
 }
 
 func TestGenerateCode_DefaultModeUsesQueryRow(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "GetUser", "one", `SELECT users.id FROM users WHERE users.id = $1;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovie", "one", `SELECT movies.id FROM movies WHERE movies.id = $1;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryRow[^C]`) // QueryRow but not QueryRowContext
 }
 
 func TestGenerateCode_DefaultModeExecResultReturnsPgconnCommandTag(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "DeleteUser", "execresult", `DELETE FROM users WHERE users.id = $1;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "DeleteMovie", "execresult", `DELETE FROM movies WHERE movies.id = $1;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `pgconn\.CommandTag`)
 }
@@ -75,83 +75,83 @@ func TestGenerateCode_DefaultModeExecResultReturnsPgconnCommandTag(t *testing.T)
 
 func TestGenerateCode_UpdateWithoutWhereReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "UpdateAll", "exec", `UPDATE users SET name = $1;`, false)
+	err := generateQuery(t, testSharedCli, "UpdateAll", "exec", `UPDATE movies SET name = $1;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `WHERE`)
 }
 
 func TestGenerateCode_UpdateWithWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "UpdateUserName", "exec", `UPDATE users SET name = $1 WHERE users.id = $2;`, false)
+	err := generateQuery(t, testSharedCli, "UpdateMovieName", "exec", `UPDATE movies SET name = $1 WHERE movies.id = $2;`, false)
 	assert.Nil(t, err)
 }
 
 func TestGenerateCode_UpdateMultipleSetWithoutWhereReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "UpdateAll", "exec", `UPDATE users SET name = $1, email = $2;`, false)
+	err := generateQuery(t, testSharedCli, "UpdateAll", "exec", `UPDATE movies SET name = $1, box_office = $2;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `WHERE`)
 }
 
 func TestGenerateCode_UpdateNamedParamWithoutWhereReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "UpdateAll", "exec", `UPDATE users SET name = @name;`, false)
+	err := generateQuery(t, testSharedCli, "UpdateAll", "exec", `UPDATE movies SET name = @name;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `WHERE`)
 }
 
 func TestGenerateCode_UpdateWithoutWhereExecResultReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "UpdateAll", "execresult", `UPDATE users SET name = $1;`, false)
+	err := generateQuery(t, testSharedCli, "UpdateAll", "execresult", `UPDATE movies SET name = $1;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `WHERE`)
 }
 
 func TestGenerateCode_UpdateWithoutWhereErrorMentionsQueryName(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "BulkUpdateUsers", "exec", `UPDATE users SET name = $1;`, false)
+	err := generateQuery(t, testSharedCli, "BulkUpdateMovies", "exec", `UPDATE movies SET name = $1;`, false)
 	assert.NotNil(t, err)
-	assert.MatchesRegexp(t, err.Error(), `BulkUpdateUsers`)
+	assert.MatchesRegexp(t, err.Error(), `BulkUpdateMovies`)
 }
 
 // --- DELETE without WHERE ---
 
 func TestGenerateCode_DeleteWithoutWhereReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "DeleteAll", "exec", `DELETE FROM users;`, false)
+	err := generateQuery(t, testSharedCli, "DeleteAll", "exec", `DELETE FROM movies;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `WHERE`)
 }
 
 func TestGenerateCode_DeleteWithWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "DeleteUser", "exec", `DELETE FROM users WHERE users.id = $1;`, false)
+	err := generateQuery(t, testSharedCli, "DeleteMovie", "exec", `DELETE FROM movies WHERE movies.id = $1;`, false)
 	assert.Nil(t, err)
 }
 
 func TestGenerateCode_DeleteWithoutWhereExecResultReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "DeleteAll", "execresult", `DELETE FROM users;`, false)
+	err := generateQuery(t, testSharedCli, "DeleteAll", "execresult", `DELETE FROM movies;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `WHERE`)
 }
 
 func TestGenerateCode_DeleteWithoutWhereErrorMentionsQueryName(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "WipeUsers", "exec", `DELETE FROM users;`, false)
+	err := generateQuery(t, testSharedCli, "WipeMovies", "exec", `DELETE FROM movies;`, false)
 	assert.NotNil(t, err)
-	assert.MatchesRegexp(t, err.Error(), `WipeUsers`)
+	assert.MatchesRegexp(t, err.Error(), `WipeMovies`)
 }
 
 func TestGenerateCode_DeleteNamedParamWithWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "DeleteUser", "exec", `DELETE FROM users WHERE users.id = @user_id;`, false)
+	err := generateQuery(t, testSharedCli, "DeleteMovie", "exec", `DELETE FROM movies WHERE movies.id = @movie_id;`, false)
 	assert.Nil(t, err)
 }
 
 func TestGenerateCode_DeleteMultipleWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "DeleteUser", "exec", `DELETE FROM users WHERE users.id = $1 AND users.name = $2;`, false)
+	err := generateQuery(t, testSharedCli, "DeleteMovie", "exec", `DELETE FROM movies WHERE movies.id = $1 AND movies.name = $2;`, false)
 	assert.Nil(t, err)
 }
 
@@ -159,7 +159,7 @@ func TestGenerateCode_DeleteMultipleWhereSucceeds(t *testing.T) {
 
 func TestGenerateCode_SelectWithoutWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "ListUsers", "many", `SELECT users.id, users.name FROM users;`, false)
+	err := generateQuery(t, testSharedCli, "ListMovies", "many", `SELECT movies.id, movies.name FROM movies;`, false)
 	assert.Nil(t, err)
 }
 
@@ -167,42 +167,42 @@ func TestGenerateCode_SelectWithoutWhereSucceeds(t *testing.T) {
 
 func TestGenerateCode_UnknownQueryTypeReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "banana", `SELECT users.id FROM users WHERE users.id = $1;`, false)
+	err := generateQuery(t, testSharedCli, "GetMovie", "banana", `SELECT movies.id FROM movies WHERE movies.id = $1;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `banana`)
 }
 
 func TestGenerateCode_UnknownQueryTypeErrorMentionsQueryName(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "banana", `SELECT users.id FROM users WHERE users.id = $1;`, false)
+	err := generateQuery(t, testSharedCli, "GetMovie", "banana", `SELECT movies.id FROM movies WHERE movies.id = $1;`, false)
 	assert.NotNil(t, err)
-	assert.MatchesRegexp(t, err.Error(), `GetUser`)
+	assert.MatchesRegexp(t, err.Error(), `GetMovie`)
 }
 
 func TestGenerateCode_UnknownQueryTypeOnInsertReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "CreateUser", "oops", `INSERT INTO users (name) VALUES ($1);`, false)
+	err := generateQuery(t, testSharedCli, "CreateMovie", "oops", `INSERT INTO movies (name) VALUES ($1);`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `oops`)
 }
 
 func TestGenerateCode_UnknownQueryTypeOnUpdateReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "UpdateUser", "wrong", `UPDATE users SET name = $1 WHERE users.id = $2;`, false)
+	err := generateQuery(t, testSharedCli, "UpdateMovie", "wrong", `UPDATE movies SET name = $1 WHERE movies.id = $2;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `wrong`)
 }
 
 func TestGenerateCode_UnknownQueryTypeOnDeleteReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "DeleteUser", "nope", `DELETE FROM users WHERE users.id = $1;`, false)
+	err := generateQuery(t, testSharedCli, "DeleteMovie", "nope", `DELETE FROM movies WHERE movies.id = $1;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `nope`)
 }
 
 func TestGenerateCode_EmptyQueryTypeReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "", `SELECT users.id FROM users WHERE users.id = $1;`, false)
+	err := generateQuery(t, testSharedCli, "GetMovie", "", `SELECT movies.id FROM movies WHERE movies.id = $1;`, false)
 	assert.NotNil(t, err)
 }
 
@@ -210,13 +210,13 @@ func TestGenerateCode_EmptyQueryTypeReturnsError(t *testing.T) {
 
 func TestGenerateCode_DistinctWithoutWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "ListUsers", "many", `SELECT DISTINCT users.id, users.name FROM users;`, false)
+	err := generateQuery(t, testSharedCli, "ListMovies", "many", `SELECT DISTINCT movies.id, movies.name FROM movies;`, false)
 	assert.Nil(t, err)
 }
 
 func TestGenerateCode_DistinctWithWhereSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "many", `SELECT DISTINCT users.id, users.name FROM users WHERE users.id = $1;`, false)
+	err := generateQuery(t, testSharedCli, "GetMovie", "many", `SELECT DISTINCT movies.id, movies.name FROM movies WHERE movies.id = $1;`, false)
 	assert.Nil(t, err)
 }
 
@@ -224,19 +224,19 @@ func TestGenerateCode_DistinctWithWhereSucceeds(t *testing.T) {
 
 func TestGenerateCode_LimitParamSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "ListUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1;`, false)
+	err := generateQuery(t, testSharedCli, "ListMovies", "many", `SELECT movies.id, movies.name FROM movies LIMIT $1;`, false)
 	assert.Nil(t, err)
 }
 
 func TestGenerateCode_LimitAndOffsetParamsSucceed(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "ListUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1 OFFSET $2;`, false)
+	err := generateQuery(t, testSharedCli, "ListMovies", "many", `SELECT movies.id, movies.name FROM movies LIMIT $1 OFFSET $2;`, false)
 	assert.Nil(t, err)
 }
 
 func TestGenerateCode_WhereWithLimitParamSucceeds(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "ListUsers", "many", `SELECT users.id, users.name FROM users WHERE users.name = $1 LIMIT $2;`, false)
+	err := generateQuery(t, testSharedCli, "ListMovies", "many", `SELECT movies.id, movies.name FROM movies WHERE movies.name = $1 LIMIT $2;`, false)
 	assert.Nil(t, err)
 }
 
@@ -245,28 +245,28 @@ func TestGenerateCode_WhereWithLimitParamSucceeds(t *testing.T) {
 func TestGenerateCode_NonSequentialParamsReturnsError(t *testing.T) {
 	t.Parallel()
 	// $1 and $31 — missing $2 through $30
-	err := generateQuery(t, testSharedCli, "GetFirstNUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1 OFFSET $31;`, false)
+	err := generateQuery(t, testSharedCli, "GetFirstNMovies", "many", `SELECT movies.id, movies.name FROM movies LIMIT $1 OFFSET $31;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `\$2`)
 }
 
 func TestGenerateCode_NonSequentialWhereParamsReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "one", `SELECT users.id, users.name FROM users WHERE users.id = $1 AND users.name = $3;`, false)
+	err := generateQuery(t, testSharedCli, "GetMovie", "one", `SELECT movies.id, movies.name FROM movies WHERE movies.id = $1 AND movies.name = $3;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `\$2`)
 }
 
 func TestGenerateCode_NonSequentialErrorMentionsQueryName(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetFirstNUsers", "many", `SELECT users.id, users.name FROM users LIMIT $1 OFFSET $31;`, false)
+	err := generateQuery(t, testSharedCli, "GetFirstNMovies", "many", `SELECT movies.id, movies.name FROM movies LIMIT $1 OFFSET $31;`, false)
 	assert.NotNil(t, err)
-	assert.MatchesRegexp(t, err.Error(), `GetFirstNUsers`)
+	assert.MatchesRegexp(t, err.Error(), `GetFirstNMovies`)
 }
 
 func TestGenerateCode_SequentialParamsSucceed(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "GetUser", "one", `SELECT users.id, users.name FROM users WHERE users.id = $1 AND users.name = $2;`, false)
+	err := generateQuery(t, testSharedCli, "GetMovie", "one", `SELECT movies.id, movies.name FROM movies WHERE movies.id = $1 AND movies.name = $2;`, false)
 	assert.Nil(t, err)
 }
 
@@ -276,10 +276,10 @@ func TestGenerateCode_ValidQueryTypesSucceed(t *testing.T) {
 		t   string
 		sql string
 	}{
-		{"one", `SELECT users.id, users.name FROM users WHERE users.id = $1;`},
-		{"many", `SELECT users.id, users.name FROM users WHERE users.id = $1;`},
-		{"exec", `DELETE FROM users WHERE users.id = $1;`},
-		{"execresult", `DELETE FROM users WHERE users.id = $1;`},
+		{"one", `SELECT movies.id, movies.name FROM movies WHERE movies.id = $1;`},
+		{"many", `SELECT movies.id, movies.name FROM movies WHERE movies.id = $1;`},
+		{"exec", `DELETE FROM movies WHERE movies.id = $1;`},
+		{"execresult", `DELETE FROM movies WHERE movies.id = $1;`},
 	}
 	for _, tc := range validTypes {
 		err := generateQuery(t, testSharedCli, "Q", tc.t, tc.sql, false)
@@ -291,72 +291,72 @@ func TestGenerateCode_ValidQueryTypesSucceed(t *testing.T) {
 
 func TestGenerateCode_InsertReturningOneUsesQueryRow(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "one",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryRow[^C]`)
 }
 
 func TestGenerateCode_InsertReturningManyUsesQuery(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "many",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "many",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `\.Query\b`)
 }
 
 func TestGenerateCode_StdModeInsertReturningOneUsesQueryRowContext(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, true)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "one",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, true)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryRowContext`)
 }
 
 func TestGenerateCode_StdModeInsertReturningManyUsesQueryContext(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "many",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, true)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "many",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, true)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryContext`)
 }
 
 func TestGenerateCode_UpdateReturningOneSucceeds(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "UpdateUserName", "one",
-		`UPDATE users SET name = $1 WHERE users.id = $2 RETURNING id, name;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "UpdateMovieName", "one",
+		`UPDATE movies SET name = $1 WHERE movies.id = $2 RETURNING id, name;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryRow[^C]`)
 }
 
 func TestGenerateCode_DeleteReturningOneSucceeds(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "DeleteUser", "one",
-		`DELETE FROM users WHERE users.id = $1 RETURNING id, name;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "DeleteMovie", "one",
+		`DELETE FROM movies WHERE movies.id = $1 RETURNING id, name;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `QueryRow[^C]`)
 }
 
 func TestGenerateCode_InsertReturningGeneratesRowStruct(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "one",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
-	assert.MatchesRegexp(t, out, `CreateUserRow`)
+	assert.MatchesRegexp(t, out, `CreateMovieRow`)
 }
 
 func TestGenerateCode_InsertReturningGeneratesSQLConst(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "one",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
-	assert.MatchesRegexp(t, out, `CreateUserSQL`)
+	assert.MatchesRegexp(t, out, `CreateMovieSQL`)
 }
 
 func TestGenerateCode_InsertReturningGeneratesScanCall(t *testing.T) {
 	t.Parallel()
-	out, err := generateQueryOutput(t, testSharedCli, "CreateUser", "one",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "one",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `\.Scan\(`)
 }
@@ -365,32 +365,32 @@ func TestGenerateCode_InsertReturningGeneratesScanCall(t *testing.T) {
 
 func TestGenerateCode_InsertReturningWithExecTypeReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "CreateUser", "exec",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	err := generateQuery(t, testSharedCli, "CreateMovie", "exec",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `RETURNING`)
 }
 
 func TestGenerateCode_InsertReturningWithExecResultTypeReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "CreateUser", "execresult",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`, false)
+	err := generateQuery(t, testSharedCli, "CreateMovie", "execresult",
+		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `RETURNING`)
 }
 
 func TestGenerateCode_InsertWithoutReturningWithOneTypeReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "CreateUser", "one",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5);`, false)
+	err := generateQuery(t, testSharedCli, "CreateMovie", "one",
+		`INSERT INTO movies (name) VALUES ($1);`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `one`)
 }
 
 func TestGenerateCode_InsertWithoutReturningWithManyTypeReturnsError(t *testing.T) {
 	t.Parallel()
-	err := generateQuery(t, testSharedCli, "CreateUser", "many",
-		`INSERT INTO users (name, email, status, role_id, org_id) VALUES ($1, $2, $3, $4, $5);`, false)
+	err := generateQuery(t, testSharedCli, "CreateMovie", "many",
+		`INSERT INTO movies (name) VALUES ($1);`, false)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `many`)
 }

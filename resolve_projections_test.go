@@ -10,7 +10,7 @@ import (
 
 func TestResolveProjections_SingleBigintColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestResolveProjections_SingleBigintColumn(t *testing.T) {
 
 func TestResolveProjections_SingleTextColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.name FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.name FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -34,61 +34,61 @@ func TestResolveProjections_SingleTextColumn(t *testing.T) {
 	assert.Equal(t, scans, []string{"&i.Name"})
 }
 
-func TestResolveProjections_VarcharColumn(t *testing.T) {
+func TestResolveProjections_TextTrailerColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.email FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT trailers.url FROM trailers WHERE trailers.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Email", Type: "string", Tag: `json:"email"`}})
-	assert.Equal(t, scans, []string{"&i.Email"})
+	assert.Equal(t, fields, []gen.Field{{Name: "Url", Type: "string", Tag: `json:"url"`}})
+	assert.Equal(t, scans, []string{"&i.Url"})
 }
 
 func TestResolveProjections_SmallintColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.status FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT cities.country_id FROM cities WHERE cities.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Status", Type: "int16", Tag: `json:"status"`}})
-	assert.Equal(t, scans, []string{"&i.Status"})
+	assert.Equal(t, fields, []gen.Field{{Name: "CountryId", Type: "int16", Tag: `json:"country_id"`}})
+	assert.Equal(t, scans, []string{"&i.CountryId"})
 }
 
 func TestResolveProjections_IntegerColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.role_id FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT trailers.id FROM trailers WHERE trailers.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`}})
-	assert.Equal(t, scans, []string{"&i.RoleId"})
+	assert.Equal(t, fields, []gen.Field{{Name: "Id", Type: "int32", Tag: `json:"id"`}})
+	assert.Equal(t, scans, []string{"&i.Id"})
 }
 
-func TestResolveProjections_BooleanColumn(t *testing.T) {
+func TestResolveProjections_DateColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.verified FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.when_released FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "Verified", Type: "bool", Tag: `json:"verified"`}})
-	assert.Equal(t, scans, []string{"&i.Verified"})
+	assert.Equal(t, fields, []gen.Field{{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`}})
+	assert.Equal(t, scans, []string{"&i.WhenReleased"})
 }
 
 func TestResolveProjections_MultipleColumns(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name, users.active FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, movies.name, movies.when_released FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -98,14 +98,14 @@ func TestResolveProjections_MultipleColumns(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Active"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.WhenReleased"})
 }
 
 func TestResolveProjections_AliasedTable(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.email, u.role_id FROM users u WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, m.name, m.box_office FROM movies m WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -114,15 +114,15 @@ func TestResolveProjections_AliasedTable(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "Email", Type: "string", Tag: `json:"email"`},
-		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Email", "&i.RoleId"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.BoxOffice"})
 }
 
 func TestResolveProjections_ColumnAlias(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id as user_id, users.name as user_name FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id as movie_id, movies.name as movie_name FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -130,15 +130,16 @@ func TestResolveProjections_ColumnAlias(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "UserId", Type: "int64", Tag: `json:"user_id"`},
-		{Name: "UserName", Type: "string", Tag: `json:"user_name"`},
+		{Name: "MovieId", Type: "int64", Tag: `json:"movie_id"`},
+		{Name: "MovieName", Type: "string", Tag: `json:"movie_name"`},
 	})
-	assert.Equal(t, scans, []string{"&i.UserId", "&i.UserName"})
+	assert.Equal(t, scans, []string{"&i.MovieId", "&i.MovieName"})
 }
 
 func TestResolveProjections_AllIntSizes(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.age, users.role_id, users.org_id FROM users WHERE users.id = $1;`)
+	// cities: state_id (smallint NULL → pgtype.Int2), country_id (smallint NN → int16), id (serial NN → int32)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT cities.state_id, cities.country_id, cities.id FROM cities WHERE cities.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -146,16 +147,16 @@ func TestResolveProjections_AllIntSizes(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
-		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
-		{Name: "OrgId", Type: "int64", Tag: `json:"org_id"`},
+		{Name: "StateId", Type: "pgtype.Int2", Tag: `json:"state_id"`},
+		{Name: "CountryId", Type: "int16", Tag: `json:"country_id"`},
+		{Name: "Id", Type: "int32", Tag: `json:"id"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Age", "&i.RoleId", "&i.OrgId"})
+	assert.Equal(t, scans, []string{"&i.StateId", "&i.CountryId", "&i.Id"})
 }
 
 func TestResolveProjections_MixedAliasAndNoAlias(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id as user_id, users.email, users.verified FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id as movie_id, movies.name, movies.box_office FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -163,16 +164,16 @@ func TestResolveProjections_MixedAliasAndNoAlias(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "UserId", Type: "int64", Tag: `json:"user_id"`},
-		{Name: "Email", Type: "string", Tag: `json:"email"`},
-		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
+		{Name: "MovieId", Type: "int64", Tag: `json:"movie_id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{"&i.UserId", "&i.Email", "&i.Verified"})
+	assert.Equal(t, scans, []string{"&i.MovieId", "&i.Name", "&i.BoxOffice"})
 }
 
 func TestResolveProjections_StarSelectReturnsError(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT * FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT * FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -184,7 +185,7 @@ func TestResolveProjections_StarSelectReturnsError(t *testing.T) {
 
 func TestResolveProjections_StarSelectWithAliasReturnsError(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT * FROM users u WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT * FROM movies m WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -196,7 +197,7 @@ func TestResolveProjections_StarSelectWithAliasReturnsError(t *testing.T) {
 
 func TestResolveProjections_TableDotStarReturnsError(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.* FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.* FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -208,7 +209,7 @@ func TestResolveProjections_TableDotStarReturnsError(t *testing.T) {
 
 func TestResolveProjections_AliasDotStarReturnsError(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.* FROM users u WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.* FROM movies m WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -220,7 +221,7 @@ func TestResolveProjections_AliasDotStarReturnsError(t *testing.T) {
 
 func TestResolveReturning_InsertSingleColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name) VALUES ($1) RETURNING id;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) RETURNING id;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -233,7 +234,7 @@ func TestResolveReturning_InsertSingleColumn(t *testing.T) {
 
 func TestResolveReturning_InsertMultipleColumns(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) RETURNING id, name, box_office;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -243,14 +244,14 @@ func TestResolveReturning_InsertMultipleColumns(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "Email", Type: "string", Tag: `json:"email"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Email"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.BoxOffice"})
 }
 
 func TestResolveReturning_InsertNullableColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, age;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) RETURNING id, when_released;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -259,14 +260,14 @@ func TestResolveReturning_InsertNullableColumn(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Age"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.WhenReleased"})
 }
 
 func TestResolveReturning_UpdateReturning(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1 WHERE users.id = $2 RETURNING id, name;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE movies SET name = $1 WHERE movies.id = $2 RETURNING id, name;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -282,7 +283,7 @@ func TestResolveReturning_UpdateReturning(t *testing.T) {
 
 func TestResolveReturning_DeleteReturning(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM users WHERE users.id = $1 RETURNING id, name, active;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM movies WHERE movies.id = $1 RETURNING id, name, when_released;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -292,15 +293,15 @@ func TestResolveReturning_DeleteReturning(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Active"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.WhenReleased"})
 }
 
 // Test returning columns that are NOT in the INSERT column list
 func TestResolveReturning_InsertReturnsColumnsNotInInsertList(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, age, login_count, active, verified;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) RETURNING id, when_released, box_office;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -309,18 +310,16 @@ func TestResolveReturning_InsertReturnsColumnsNotInInsertList(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
-		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
-		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.LoginCount", "&i.Active", "&i.Verified"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.WhenReleased", "&i.BoxOffice"})
 }
 
 // Test returning only nullable columns
 func TestResolveReturning_OnlyNullableColumns(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) RETURNING age, login_count, referrer_id, active;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) RETURNING when_released, box_office;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -328,18 +327,16 @@ func TestResolveReturning_OnlyNullableColumns(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
-		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
-		{Name: "ReferrerId", Type: "pgtype.Int8", Tag: `json:"referrer_id"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Age", "&i.LoginCount", "&i.ReferrerId", "&i.Active"})
+	assert.Equal(t, scans, []string{"&i.WhenReleased", "&i.BoxOffice"})
 }
 
-// Test returning all 11 columns from INSERT
+// Test returning all 4 columns from movies
 func TestResolveReturning_InsertReturnsAllColumns(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email, status) VALUES ($1, $2, $3) RETURNING id, name, email, age, status, role_id, login_count, org_id, referrer_id, active, verified;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) RETURNING id, name, when_released, box_office;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -349,27 +346,17 @@ func TestResolveReturning_InsertReturnsAllColumns(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "Email", Type: "string", Tag: `json:"email"`},
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
-		{Name: "Status", Type: "int16", Tag: `json:"status"`},
-		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
-		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
-		{Name: "OrgId", Type: "int64", Tag: `json:"org_id"`},
-		{Name: "ReferrerId", Type: "pgtype.Int8", Tag: `json:"referrer_id"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
-		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{
-		"&i.Id", "&i.Name", "&i.Email", "&i.Age", "&i.Status",
-		"&i.RoleId", "&i.LoginCount", "&i.OrgId", "&i.ReferrerId",
-		"&i.Active", "&i.Verified",
-	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.WhenReleased", "&i.BoxOffice"})
 }
 
-// Test nullable vs not-null booleans in RETURNING
-func TestResolveReturning_BooleanNullability(t *testing.T) {
+// Test nullable vs not-null columns in RETURNING
+func TestResolveReturning_NullableVsNotNullColumns(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1 WHERE users.id = $2 RETURNING active, verified;`)
+	// name is NOT NULL (string), when_released is NULL (pgtype.Date)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE movies SET name = $1 WHERE movies.id = $2 RETURNING name, when_released;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -377,27 +364,27 @@ func TestResolveReturning_BooleanNullability(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
-		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Active", "&i.Verified"})
+	assert.Equal(t, scans, []string{"&i.Name", "&i.WhenReleased"})
 }
 
 // Test same RETURNING columns across all three DML types for consistency
 func TestResolveReturning_ConsistentAcrossInsertUpdateDelete(t *testing.T) {
 	t.Parallel()
 
-	returningCols := "RETURNING id, name, age, role_id, active;"
+	returningCols := "RETURNING id, name, when_released, box_office;"
 
-	insertSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO users (name, email) VALUES ($1, $2) ` + returningCols)
+	insertSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name) VALUES ($1) ` + returningCols)
 	if err != nil {
 		t.Fatalf("failed to parse INSERT: %v", err)
 	}
-	updateSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET email = $1 WHERE users.id = $2 ` + returningCols)
+	updateSQL, err := postgresparser.ParseSQLStrict(`UPDATE movies SET name = $1 WHERE movies.id = $2 ` + returningCols)
 	if err != nil {
 		t.Fatalf("failed to parse UPDATE: %v", err)
 	}
-	deleteSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM users WHERE users.id = $1 ` + returningCols)
+	deleteSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM movies WHERE movies.id = $1 ` + returningCols)
 	if err != nil {
 		t.Fatalf("failed to parse DELETE: %v", err)
 	}
@@ -405,11 +392,10 @@ func TestResolveReturning_ConsistentAcrossInsertUpdateDelete(t *testing.T) {
 	expectedFields := []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
-		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	}
-	expectedScans := []string{"&i.Id", "&i.Name", "&i.Age", "&i.RoleId", "&i.Active"}
+	expectedScans := []string{"&i.Id", "&i.Name", "&i.WhenReleased", "&i.BoxOffice"}
 
 	insertFields, insertScans, err := testSharedCli.resolveReturning(insertSQL)
 	assert.Nil(t, err)
@@ -427,12 +413,11 @@ func TestResolveReturning_ConsistentAcrossInsertUpdateDelete(t *testing.T) {
 	assert.Equal(t, deleteScans, expectedScans)
 }
 
-// Test alternating nullable/not-null int sizes in RETURNING
-func TestResolveReturning_AlternatingNullableIntSizes(t *testing.T) {
+// Test alternating nullable/not-null columns in RETURNING
+func TestResolveReturning_AlternatingNullableColumns(t *testing.T) {
 	t.Parallel()
-
-	// age(nullable smallint), status(not-null smallint), login_count(nullable int), role_id(not-null int), referrer_id(nullable bigint), org_id(not-null bigint)
-	parsedSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM users WHERE users.id = $1 RETURNING age, status, login_count, role_id, referrer_id, org_id;`)
+	// box_office(nullable int), id(not-null bigint), when_released(nullable date), name(not-null text)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`DELETE FROM movies WHERE movies.id = $1 RETURNING box_office, id, when_released, name;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -440,20 +425,18 @@ func TestResolveReturning_AlternatingNullableIntSizes(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveReturning(parsedSQL)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},
-		{Name: "Status", Type: "int16", Tag: `json:"status"`},
-		{Name: "LoginCount", Type: "pgtype.Int4", Tag: `json:"login_count"`},
-		{Name: "RoleId", Type: "int32", Tag: `json:"role_id"`},
-		{Name: "ReferrerId", Type: "pgtype.Int8", Tag: `json:"referrer_id"`},
-		{Name: "OrgId", Type: "int64", Tag: `json:"org_id"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Age", "&i.Status", "&i.LoginCount", "&i.RoleId", "&i.ReferrerId", "&i.OrgId"})
+	assert.Equal(t, scans, []string{"&i.BoxOffice", "&i.Id", "&i.WhenReleased", "&i.Name"})
 }
 
 // Test UPDATE returning the column being set + other columns
 func TestResolveReturning_UpdateReturnsSetColumnAndOthers(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE users SET name = $1, active = $2 WHERE users.id = $3 RETURNING id, name, email, active, verified;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE movies SET name = $1, box_office = $2 WHERE movies.id = $3 RETURNING id, name, when_released, box_office;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -463,18 +446,17 @@ func TestResolveReturning_UpdateReturnsSetColumnAndOthers(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "Email", Type: "string", Tag: `json:"email"`},
-		{Name: "Active", Type: "pgtype.Bool", Tag: `json:"active"`},
-		{Name: "Verified", Type: "bool", Tag: `json:"verified"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Email", "&i.Active", "&i.Verified"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.WhenReleased", "&i.BoxOffice"})
 }
 
 // JOIN tests
 
 func TestResolveProjections_InnerJoinColumnsFromBothTables(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.name, p.id as post_id, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, m.name, t.id as trailer_id, t.url FROM movies m JOIN trailers t ON t.movie_id = m.id WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -484,15 +466,15 @@ func TestResolveProjections_InnerJoinColumnsFromBothTables(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "PostId", Type: "int64", Tag: `json:"post_id"`},
-		{Name: "Title", Type: "string", Tag: `json:"title"`},
+		{Name: "TrailerId", Type: "int32", Tag: `json:"trailer_id"`},
+		{Name: "Url", Type: "string", Tag: `json:"url"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.TrailerId", "&i.Url"})
 }
 
 func TestResolveProjections_LeftJoinForcesNullableOnJoinedTable(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.name, p.id as post_id, p.title, p.published FROM users u LEFT JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, m.name, t.id as trailer_id, t.url FROM movies m LEFT JOIN trailers t ON t.movie_id = m.id WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -500,20 +482,19 @@ func TestResolveProjections_LeftJoinForcesNullableOnJoinedTable(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64", Tag: `json:"id"`},                     // users.id — NOT NULL, base table
-		{Name: "Name", Type: "string", Tag: `json:"name"`},                // users.name — NOT NULL, base table
-		{Name: "PostId", Type: "pgtype.Int8", Tag: `json:"post_id"`},      // posts.id — NOT NULL in schema but LEFT JOIN makes it nullable
-		{Name: "Title", Type: "pgtype.Text", Tag: `json:"title"`},         // posts.title — NOT NULL in schema but LEFT JOIN makes it nullable
-		{Name: "Published", Type: "pgtype.Bool", Tag: `json:"published"`}, // posts.published — NOT NULL but LEFT JOIN makes it nullable
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},                    // movies.id — NOT NULL, base table
+		{Name: "Name", Type: "string", Tag: `json:"name"`},               // movies.name — NOT NULL, base table
+		{Name: "TrailerId", Type: "pgtype.Int4", Tag: `json:"trailer_id"`}, // trailers.id — NOT NULL in schema but LEFT JOIN makes it nullable
+		{Name: "Url", Type: "pgtype.Text", Tag: `json:"url"`},            // trailers.url — NOT NULL in schema but LEFT JOIN makes it nullable
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.PostId", "&i.Title", "&i.Published"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.TrailerId", "&i.Url"})
 }
 
 func TestResolveProjections_LeftJoinNullableColumnStaysNullable(t *testing.T) {
 	t.Parallel()
 
-	// posts.body is already nullable in schema, LEFT JOIN should still produce pgtype.Text
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.body FROM users u LEFT JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	// trailers.when_released is already nullable in schema, LEFT JOIN should still produce pgtype.Date
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, t.when_released FROM movies m LEFT JOIN trailers t ON t.movie_id = m.id WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -522,14 +503,14 @@ func TestResolveProjections_LeftJoinNullableColumnStaysNullable(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "Body", Type: "pgtype.Text", Tag: `json:"body"`},
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Body"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.WhenReleased"})
 }
 
 func TestResolveProjections_InnerJoinDoesNotForceNullable(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, p.title, p.published FROM users u INNER JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, t.url, t.id as trailer_id FROM movies m INNER JOIN trailers t ON t.movie_id = m.id WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -538,15 +519,15 @@ func TestResolveProjections_InnerJoinDoesNotForceNullable(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "Title", Type: "string", Tag: `json:"title"`},       // NOT NULL, INNER JOIN doesn't force nullable
-		{Name: "Published", Type: "bool", Tag: `json:"published"`}, // NOT NULL, INNER JOIN doesn't force nullable
+		{Name: "Url", Type: "string", Tag: `json:"url"`},         // NOT NULL, INNER JOIN doesn't force nullable
+		{Name: "TrailerId", Type: "int32", Tag: `json:"trailer_id"`}, // NOT NULL, INNER JOIN doesn't force nullable
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Title", "&i.Published"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Url", "&i.TrailerId"})
 }
 
 func TestResolveProjections_RightJoinForcesNullableOnBaseTable(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.name, p.title FROM users u RIGHT JOIN posts p ON u.id = p.user_id WHERE p.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, m.name, t.url FROM movies m RIGHT JOIN trailers t ON t.movie_id = m.id WHERE t.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -554,18 +535,18 @@ func TestResolveProjections_RightJoinForcesNullableOnBaseTable(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "pgtype.Int8", Tag: `json:"id"`},     // users.id — NOT NULL but RIGHT JOIN makes base table nullable
-		{Name: "Name", Type: "pgtype.Text", Tag: `json:"name"`}, // users.name — NOT NULL but RIGHT JOIN makes base table nullable
-		{Name: "Title", Type: "string", Tag: `json:"title"`},    // posts.title — NOT NULL, joined table in RIGHT JOIN keeps types
+		{Name: "Id", Type: "pgtype.Int8", Tag: `json:"id"`},     // movies.id — NOT NULL but RIGHT JOIN makes base table nullable
+		{Name: "Name", Type: "pgtype.Text", Tag: `json:"name"`}, // movies.name — NOT NULL but RIGHT JOIN makes base table nullable
+		{Name: "Url", Type: "string", Tag: `json:"url"`},        // trailers.url — NOT NULL, joined table in RIGHT JOIN keeps types
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Title"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Url"})
 }
 
 func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
 	t.Parallel()
 
 	// INNER JOIN: nullable columns stay nullable, not-null stay not-null
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT u.id, u.age, p.title, p.body FROM users u JOIN posts p ON u.id = p.user_id WHERE u.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT m.id, m.box_office, t.url, t.when_released FROM movies m JOIN trailers t ON t.movie_id = m.id WHERE m.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -573,12 +554,12 @@ func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Id", Type: "int64", Tag: `json:"id"`},           // users.id — NOT NULL
-		{Name: "Age", Type: "pgtype.Int2", Tag: `json:"age"`},   // users.age — nullable in schema
-		{Name: "Title", Type: "string", Tag: `json:"title"`},    // posts.title — NOT NULL
-		{Name: "Body", Type: "pgtype.Text", Tag: `json:"body"`}, // posts.body — nullable in schema
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},                    // movies.id — NOT NULL
+		{Name: "BoxOffice", Type: "pgtype.Int4", Tag: `json:"box_office"`}, // movies.box_office — nullable in schema
+		{Name: "Url", Type: "string", Tag: `json:"url"`},                 // trailers.url — NOT NULL
+		{Name: "WhenReleased", Type: "pgtype.Date", Tag: `json:"when_released"`}, // trailers.when_released — nullable in schema
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.Age", "&i.Title", "&i.Body"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.BoxOffice", "&i.Url", "&i.WhenReleased"})
 }
 
 // Subquery tests — projections
@@ -586,9 +567,7 @@ func TestResolveProjections_JoinWithMixedNullability(t *testing.T) {
 func TestResolveProjections_WhereInSubqueryColumns(t *testing.T) {
 	t.Parallel()
 	// WHERE IN subquery: parser only exposes outer table columns in Columns
-	// The subquery's table (posts) is not in Tables, only users is
-
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE users.id IN (SELECT posts.user_id FROM posts WHERE posts.title = $1);`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, movies.name FROM movies WHERE movies.id IN (SELECT trailers.movie_id FROM trailers WHERE trailers.url = $1);`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -605,8 +584,7 @@ func TestResolveProjections_WhereInSubqueryColumns(t *testing.T) {
 func TestResolveProjections_ExistsSubqueryColumns(t *testing.T) {
 	t.Parallel()
 	// EXISTS subquery: parser only exposes outer table columns
-
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users WHERE EXISTS (SELECT 1 FROM posts WHERE posts.user_id = users.id) AND users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, movies.name FROM movies WHERE EXISTS (SELECT 1 FROM trailers WHERE trailers.movie_id = movies.id) AND movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -624,8 +602,7 @@ func TestResolveProjections_ScalarSubqueryInSelect(t *testing.T) {
 	t.Parallel()
 	// Scalar subquery in SELECT: the entire subquery becomes a column expression
 	// Our code won't find a table.column pattern, so it falls through to "string"
-
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, (SELECT COUNT(*) FROM posts WHERE posts.user_id = users.id) as post_count FROM users WHERE users.id = $1;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, (SELECT COUNT(*) FROM trailers WHERE trailers.movie_id = movies.id) as trailer_count FROM movies WHERE movies.id = $1;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -634,14 +611,14 @@ func TestResolveProjections_ScalarSubqueryInSelect(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Id", Type: "int64", Tag: `json:"id"`},
-		{Name: "PostCount", Type: "string", Tag: `json:"post_count"`}, // scalar subquery falls through to default string
+		{Name: "TrailerCount", Type: "string", Tag: `json:"trailer_count"`}, // scalar subquery falls through to default string
 	})
-	assert.Equal(t, scans, []string{"&i.Id", "&i.PostCount"})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.TrailerCount"})
 }
 
 func TestResolveProjections_KnownColumnsStillResolveAfterFix(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.id, users.name FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, movies.name FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -658,7 +635,7 @@ func TestResolveProjections_KnownColumnsStillResolveAfterFix(t *testing.T) {
 
 func TestResolveProjections_CountStarWithoutAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(*) FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(*) FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -669,7 +646,7 @@ func TestResolveProjections_CountStarWithoutAliasErrors(t *testing.T) {
 
 func TestResolveProjections_CountColumnWithoutAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(users.id) FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(movies.id) FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -680,7 +657,7 @@ func TestResolveProjections_CountColumnWithoutAliasErrors(t *testing.T) {
 
 func TestResolveProjections_SumWithoutAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.age) FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(cities.state_id) FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -693,7 +670,7 @@ func TestResolveProjections_SumWithoutAliasErrors(t *testing.T) {
 
 func TestResolveProjections_CountStarWithAlias(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(*) AS total FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(*) AS total FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -705,7 +682,7 @@ func TestResolveProjections_CountStarWithAlias(t *testing.T) {
 
 func TestResolveProjections_CountColumnWithAlias(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(users.id) AS cnt FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COUNT(movies.id) AS cnt FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -717,7 +694,7 @@ func TestResolveProjections_CountColumnWithAlias(t *testing.T) {
 
 func TestResolveProjections_CountMixedWithRegularColumn(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.name, COUNT(*) AS user_count FROM users GROUP BY users.name;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.name, COUNT(*) AS movie_count FROM movies GROUP BY movies.name;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -725,29 +702,29 @@ func TestResolveProjections_CountMixedWithRegularColumn(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
-		{Name: "UserCount", Type: "int64", Tag: `json:"user_count"`},
+		{Name: "MovieCount", Type: "int64", Tag: `json:"movie_count"`},
 	})
-	assert.Equal(t, scanFields, []string{"&i.Name", "&i.UserCount"})
+	assert.Equal(t, scanFields, []string{"&i.Name", "&i.MovieCount"})
 }
 
 // --- SUM: nullable, same base type as column ---
 
 func TestResolveProjections_SumSmallint(t *testing.T) {
 	t.Parallel()
-	// age SMALLINT (nullable) → pgtype.Int2
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.age) AS total_age FROM users;`)
+	// cities.state_id SMALLINT (nullable) → pgtype.Int2
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(cities.state_id) AS total FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "TotalAge", Type: "pgtype.Int2", Tag: `json:"total_age"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "Total", Type: "pgtype.Int2", Tag: `json:"total"`}})
 }
 
 func TestResolveProjections_SumInteger(t *testing.T) {
 	t.Parallel()
-	// role_id INTEGER NOT NULL → pgtype.Int4 (SUM forces nullable)
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.role_id) AS total FROM users;`)
+	// movies.box_office INTEGER NULL → pgtype.Int4 (SUM of nullable int)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(movies.box_office) AS total FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -758,8 +735,8 @@ func TestResolveProjections_SumInteger(t *testing.T) {
 
 func TestResolveProjections_SumBigint(t *testing.T) {
 	t.Parallel()
-	// org_id BIGINT NOT NULL → pgtype.Int8 (SUM forces nullable)
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(users.org_id) AS total FROM users;`)
+	// movies.id BIGINT NOT NULL → pgtype.Int8 (SUM forces nullable)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT SUM(movies.id) AS total FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -772,8 +749,8 @@ func TestResolveProjections_SumBigint(t *testing.T) {
 
 func TestResolveProjections_CoalesceOfSumSmallint(t *testing.T) {
 	t.Parallel()
-	// COALESCE(SUM(users.age), 0) → int16 (non-nullable smallint)
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(users.age), 0) AS total FROM users;`)
+	// COALESCE(SUM(cities.state_id), 0) → int16 (non-nullable smallint)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(cities.state_id), 0) AS total FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -784,8 +761,8 @@ func TestResolveProjections_CoalesceOfSumSmallint(t *testing.T) {
 
 func TestResolveProjections_CoalesceOfSumInteger(t *testing.T) {
 	t.Parallel()
-	// COALESCE(SUM(users.role_id), 0) → int32
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(users.role_id), 0) AS total FROM users;`)
+	// COALESCE(SUM(movies.box_office), 0) → int32
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(movies.box_office), 0) AS total FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -796,8 +773,8 @@ func TestResolveProjections_CoalesceOfSumInteger(t *testing.T) {
 
 func TestResolveProjections_CoalesceOfSumBigint(t *testing.T) {
 	t.Parallel()
-	// COALESCE(SUM(users.org_id), 0) → int64
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(users.org_id), 0) AS total FROM users;`)
+	// COALESCE(SUM(movies.id), 0) → int64
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(SUM(movies.id), 0) AS total FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -810,7 +787,7 @@ func TestResolveProjections_CoalesceOfSumBigint(t *testing.T) {
 
 func TestResolveProjections_AvgWithoutAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(users.age) FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(cities.state_id) FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -821,31 +798,31 @@ func TestResolveProjections_AvgWithoutAliasErrors(t *testing.T) {
 
 func TestResolveProjections_AvgSmallint(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(users.age) AS avg_age FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(cities.state_id) AS avg_state FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "AvgAge", Type: "pgtype.Float8", Tag: `json:"avg_age"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "AvgState", Type: "pgtype.Float8", Tag: `json:"avg_state"`}})
 }
 
 func TestResolveProjections_AvgBigint(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(users.org_id) AS avg_org FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT AVG(movies.id) AS avg_id FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "AvgOrg", Type: "pgtype.Float8", Tag: `json:"avg_org"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "AvgId", Type: "pgtype.Float8", Tag: `json:"avg_id"`}})
 }
 
 // --- MIN / MAX: nullable, same base type as column ---
 
 func TestResolveProjections_MinWithoutAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(users.age) FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(cities.state_id) FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -856,7 +833,7 @@ func TestResolveProjections_MinWithoutAliasErrors(t *testing.T) {
 
 func TestResolveProjections_MaxWithoutAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(users.age) FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(cities.state_id) FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -867,74 +844,74 @@ func TestResolveProjections_MaxWithoutAliasErrors(t *testing.T) {
 
 func TestResolveProjections_MinSmallint(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(users.age) AS min_age FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(cities.state_id) AS min_state FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "MinAge", Type: "pgtype.Int2", Tag: `json:"min_age"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "MinState", Type: "pgtype.Int2", Tag: `json:"min_state"`}})
 }
 
 func TestResolveProjections_MaxSmallint(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(users.age) AS max_age FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(cities.state_id) AS max_state FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "MaxAge", Type: "pgtype.Int2", Tag: `json:"max_age"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "MaxState", Type: "pgtype.Int2", Tag: `json:"max_state"`}})
 }
 
 func TestResolveProjections_MinInteger(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(users.role_id) AS min_role FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MIN(movies.box_office) AS min_box FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "MinRole", Type: "pgtype.Int4", Tag: `json:"min_role"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "MinBox", Type: "pgtype.Int4", Tag: `json:"min_box"`}})
 }
 
 func TestResolveProjections_MaxBigint(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(users.org_id) AS max_org FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT MAX(movies.id) AS max_id FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "MaxOrg", Type: "pgtype.Int8", Tag: `json:"max_org"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "MaxId", Type: "pgtype.Int8", Tag: `json:"max_id"`}})
 }
 
 func TestResolveProjections_CoalesceOfMin(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(MIN(users.age), 0) AS min_age FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(MIN(cities.state_id), 0) AS min_state FROM cities;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "MinAge", Type: "int16", Tag: `json:"min_age"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "MinState", Type: "int16", Tag: `json:"min_state"`}})
 }
 
 func TestResolveProjections_CoalesceOfMax(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(MAX(users.org_id), 0) AS max_org FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(MAX(movies.id), 0) AS max_id FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	fields, _, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
-	assert.Equal(t, fields, []gen.Field{{Name: "MaxOrg", Type: "int64", Tag: `json:"max_org"`}})
+	assert.Equal(t, fields, []gen.Field{{Name: "MaxId", Type: "int64", Tag: `json:"max_id"`}})
 }
 
 func TestResolveProjections_CoalesceOfCount(t *testing.T) {
 	t.Parallel()
 	// COALESCE(COUNT(*), 0) → int64 (COUNT already non-nullable, stays int64)
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(COUNT(*), 0) AS total FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT COALESCE(COUNT(*), 0) AS total FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -945,7 +922,7 @@ func TestResolveProjections_CoalesceOfCount(t *testing.T) {
 
 func TestResolveProjections_FromSubqueryErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT sub.id, sub.name FROM (SELECT users.id, users.name FROM users WHERE users.age > $1) sub WHERE sub.id = $2;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT sub.id, sub.name FROM (SELECT movies.id, movies.name FROM movies WHERE movies.box_office > $1) sub WHERE sub.id = $2;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -958,7 +935,7 @@ func TestResolveProjections_FromSubqueryErrors(t *testing.T) {
 // --- Unknown column / table errors ---
 func TestResolveProjections_UnknownColumnErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.nonexistent FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.nonexistent FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -969,18 +946,18 @@ func TestResolveProjections_UnknownColumnErrors(t *testing.T) {
 
 func TestResolveProjections_UnknownColumnErrorMentionsTable(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT users.typo_col FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.typo_col FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
 	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
-	assert.MatchesRegexp(t, err.Error(), `users`)
+	assert.MatchesRegexp(t, err.Error(), `movies`)
 }
 
 func TestResolveProjections_UnknownTableAliasErrors(t *testing.T) {
 	t.Parallel()
-	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT x.id FROM users;`)
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT x.id FROM movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -993,13 +970,13 @@ func TestResolveProjections_CTEColumnAlias(t *testing.T) {
 	t.Parallel()
 	// Outer query selects columns prefixed with the CTE alias name
 	parsedSQL, err := postgresparser.ParseSQLStrict(`
-WITH active_users AS (
-    SELECT users.id, users.name
-    FROM users
-    WHERE users.active = $1
+WITH recent_movies AS (
+    SELECT movies.id, movies.name
+    FROM movies
+    WHERE movies.when_released = $1
 )
-SELECT active_users.id, active_users.name
-FROM active_users;`)
+SELECT recent_movies.id, recent_movies.name
+FROM recent_movies;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -1017,14 +994,14 @@ func TestResolveProjections_CTEMixedWithRealTable(t *testing.T) {
 	t.Parallel()
 	// Outer query mixes columns from a CTE alias and a real joined table
 	parsedSQL, err := postgresparser.ParseSQLStrict(`
-WITH recent_posts AS (
-    SELECT posts.id, posts.title, posts.user_id
-    FROM posts
-    WHERE posts.published = $1
+WITH recent_trailers AS (
+    SELECT trailers.id, trailers.url, trailers.movie_id
+    FROM trailers
+    WHERE trailers.when_released = $1
 )
-SELECT recent_posts.title, users.name
-FROM recent_posts
-JOIN users ON users.id = recent_posts.user_id;`)
+SELECT recent_trailers.url, movies.name
+FROM recent_trailers
+JOIN movies ON movies.id = recent_trailers.movie_id;`)
 	if err != nil {
 		t.Fatalf("failed to parse query: %v", err)
 	}
@@ -1032,8 +1009,8 @@ JOIN users ON users.id = recent_posts.user_id;`)
 	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.Nil(t, err)
 	assert.Equal(t, fields, []gen.Field{
-		{Name: "Title", Type: "string", Tag: `json:"title"`},
+		{Name: "Url", Type: "string", Tag: `json:"url"`},
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
 	})
-	assert.Equal(t, scans, []string{"&i.Title", "&i.Name"})
+	assert.Equal(t, scans, []string{"&i.Url", "&i.Name"})
 }
