@@ -191,6 +191,16 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 			return "pgtype.Date"
 		}
 		return "pgtype.Date"
+	case "timestamp", "timestamp without time zone":
+		if nullable {
+			return "pgtype.Timestamp"
+		}
+		return "time.Time"
+	case "timestamptz", "timestamp with time zone":
+		if nullable {
+			return "pgtype.Timestamptz"
+		}
+		return "time.Time"
 	default:
 		return "string"
 	}

@@ -160,7 +160,7 @@ c.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 The old approach (parsing `db/schema/*.sql` via `postgresparser.ParseSQLStrict`) was replaced with:
 
 1. Run all `db/migrations/*.up.sql` files against an in-memory pglite instance
-2. Query `information_schema.columns` (filtering `table_schema != 'pg_catalog'` — actually using `= 'pg_catalog'` in the current code, which may be a bug to revisit)
+2. Query `information_schema.columns` with `WHERE table_schema = 'pg_catalog'` — this is intentional: pglite exposes user-created tables under `pg_catalog`, not `public`. The filter is correct for pglite and should not be changed to `'public'`.
 3. Populate `c.tablesCol` from the result
 
 **pglite setup:**
@@ -219,7 +219,7 @@ CREATE TABLE posts (
 
 ## Known Issues / Gaps
 
-- `load_schema.go` queries `WHERE table_schema = 'pg_catalog'` — this loads only system catalog tables, not user-defined tables. User tables are under `table_schema = 'public'`. This appears to be a bug (or a placeholder) — yet the system works because the `tablesCol` lookup is only used for type resolution, and all queries are validated against pglite first. **Worth investigating.**
+- `load_schema.go` queries `WHERE table_schema = 'pg_catalog'` — **this is correct and intentional**. pglite exposes user-created tables under `pg_catalog`, not `public`. Do not change this to `'public'`.
 - `db/db.go` imports `github.com/jackc/pgx/v5` but that package is not in `go.mod` (the generator itself uses pglite). The generated `db/` package is intended to be used in a consumer project that has pgx as a dependency.
-- Duplicate query names within a file are not detected (noted in original CLAUDE.md).
+- Duplicate query names within a file are not detected — **this is intentional**, not a bug. The behaviour is acceptable and there are no plans to add detection.
 - No params struct generated for 3+ parameters (noted in original CLAUDE.md).

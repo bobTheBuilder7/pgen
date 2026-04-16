@@ -86,6 +86,32 @@ func TestResolveProjections_DateColumn(t *testing.T) {
 	assert.Equal(t, scans, []string{"&i.WhenReleased"})
 }
 
+func TestResolveProjections_TimestamptzNotNullColumn(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.created_at FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "CreatedAt", Type: "time.Time", Tag: `json:"created_at"`}})
+	assert.Equal(t, scans, []string{"&i.CreatedAt"})
+}
+
+func TestResolveProjections_TimestamptzNullableColumn(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.updated_at FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "UpdatedAt", Type: "pgtype.Timestamptz", Tag: `json:"updated_at"`}})
+	assert.Equal(t, scans, []string{"&i.UpdatedAt"})
+}
+
 func TestResolveProjections_MultipleColumns(t *testing.T) {
 	t.Parallel()
 	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, movies.name, movies.when_released FROM movies WHERE movies.id = $1;`)
@@ -1013,4 +1039,16 @@ JOIN movies ON movies.id = recent_trailers.movie_id;`)
 		{Name: "Name", Type: "string", Tag: `json:"name"`},
 	})
 	assert.Equal(t, scans, []string{"&i.Url", "&i.Name"})
+}
+
+func TestPgTypeToGoType_TimestampNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("timestamp", false), "time.Time")
+	assert.Equal(t, pgTypeToGoType("timestamp without time zone", false), "time.Time")
+}
+
+func TestPgTypeToGoType_TimestampNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("timestamp", true), "pgtype.Timestamp")
+	assert.Equal(t, pgTypeToGoType("timestamp without time zone", true), "pgtype.Timestamp")
 }

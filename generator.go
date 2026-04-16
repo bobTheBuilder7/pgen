@@ -19,6 +19,9 @@ func (c *cli) generateCode(_ context.Context, queries []resolvedQuery, output io
 		f.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgconn"))
 		f.AddBlock(gen.Import("", "github.com/jackc/pgx/v5/pgtype"))
 	}
+	if usesTimeType(queries) {
+		f.AddBlock(gen.Import("", "time"))
+	}
 
 	for _, rq := range queries {
 		emitQuery(f, rq, std)
@@ -126,4 +129,20 @@ func stringersFromStrings(ss []string) []fmt.Stringer {
 		out[i] = gen.Arg(s)
 	}
 	return out
+}
+
+func usesTimeType(queries []resolvedQuery) bool {
+	for _, rq := range queries {
+		for _, f := range rq.rowFields {
+			if f.Type == "time.Time" {
+				return true
+			}
+		}
+		for _, pt := range rq.paramTypes {
+			if pt == "time.Time" {
+				return true
+			}
+		}
+	}
+	return false
 }
