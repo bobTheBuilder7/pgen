@@ -1052,3 +1052,91 @@ func TestPgTypeToGoType_TimestampNullable(t *testing.T) {
 	assert.Equal(t, pgTypeToGoType("timestamp", true), "pgtype.Timestamp")
 	assert.Equal(t, pgTypeToGoType("timestamp without time zone", true), "pgtype.Timestamp")
 }
+
+func TestResolveProjections_JsonbNullableColumn(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.metadata FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Metadata", Type: "pgtype.JSONB", Tag: `json:"metadata"`}})
+	assert.Equal(t, scans, []string{"&i.Metadata"})
+}
+
+func TestResolveProjections_JsonNotNullColumn(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.config FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Config", Type: "[]byte", Tag: `json:"config"`}})
+	assert.Equal(t, scans, []string{"&i.Config"})
+}
+
+func TestResolveProjections_NumericNullableColumn(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.rating FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Rating", Type: "pgtype.Numeric", Tag: `json:"rating"`}})
+	assert.Equal(t, scans, []string{"&i.Rating"})
+}
+
+func TestResolveProjections_NumericNotNullColumn(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.price FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Price", Type: "pgtype.Numeric", Tag: `json:"price"`}})
+	assert.Equal(t, scans, []string{"&i.Price"})
+}
+
+func TestPgTypeToGoType_JsonbNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("jsonb", false), "[]byte")
+}
+
+func TestPgTypeToGoType_JsonbNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("jsonb", true), "pgtype.JSONB")
+}
+
+func TestPgTypeToGoType_JsonNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("json", false), "[]byte")
+}
+
+func TestPgTypeToGoType_JsonNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("json", true), "pgtype.JSON")
+}
+
+func TestPgTypeToGoType_NumericNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("numeric", false), "pgtype.Numeric")
+}
+
+func TestPgTypeToGoType_NumericNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("numeric", true), "pgtype.Numeric")
+}
+
+func TestPgTypeToGoType_DecimalAlias(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("decimal", false), "pgtype.Numeric")
+	assert.Equal(t, pgTypeToGoType("decimal", true), "pgtype.Numeric")
+}

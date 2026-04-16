@@ -201,6 +201,18 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 			return "pgtype.Timestamptz"
 		}
 		return "time.Time"
+	case "json":
+		if nullable {
+			return "pgtype.JSON"
+		}
+		return "[]byte"
+	case "jsonb":
+		if nullable {
+			return "pgtype.JSONB"
+		}
+		return "[]byte"
+	case "numeric", "decimal":
+		return "pgtype.Numeric"
 	default:
 		return "string"
 	}

@@ -1029,3 +1029,72 @@ WHERE movies.id = $2;`)
 	assert.Equal(t, names, []string{"when_released", "id"})
 	assert.Equal(t, types, []string{"pgtype.Date", "int64"})
 }
+
+func TestResolveParams_JsonbParam(t *testing.T) {
+	t.Parallel()
+	// movies.metadata is jsonb NULL → pgtype.JSONB
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.metadata = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"metadata"})
+	assert.Equal(t, types, []string{"pgtype.JSONB"})
+}
+
+func TestResolveParams_JsonNotNullParam(t *testing.T) {
+	t.Parallel()
+	// movies.config is json NOT NULL → []byte
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.config = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"config"})
+	assert.Equal(t, types, []string{"[]byte"})
+}
+
+func TestResolveParams_NumericNullableParam(t *testing.T) {
+	t.Parallel()
+	// movies.rating is numeric NULL → pgtype.Numeric
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.rating = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"rating"})
+	assert.Equal(t, types, []string{"pgtype.Numeric"})
+}
+
+func TestResolveParams_NumericNotNullParam(t *testing.T) {
+	t.Parallel()
+	// movies.price is numeric NOT NULL → pgtype.Numeric
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.price = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"price"})
+	assert.Equal(t, types, []string{"pgtype.Numeric"})
+}
+
+func TestResolveParams_InsertJsonbAndNumeric(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, metadata, config, rating, price) VALUES ($1, $2, $3, $4, $5);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "metadata", "config", "rating", "price"})
+	assert.Equal(t, types, []string{"string", "pgtype.JSONB", "[]byte", "pgtype.Numeric", "pgtype.Numeric"})
+}
