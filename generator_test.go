@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/bobTheBuilder7/assert"
@@ -359,6 +360,57 @@ func TestGenerateCode_InsertReturningGeneratesScanCall(t *testing.T) {
 		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
 	assert.MatchesRegexp(t, out, `\.Scan\(`)
+}
+
+// --- Params struct (2+ params) ---
+
+func TestGenerateCode_TwoParamsGeneratesParamsStruct(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovie", "one",
+		`SELECT movies.id FROM movies WHERE movies.id = $1 AND movies.name = $2;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `GetMovieParams`)
+}
+
+func TestGenerateCode_TwoParamsUsesArgInSignature(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovie", "one",
+		`SELECT movies.id FROM movies WHERE movies.id = $1 AND movies.name = $2;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `arg GetMovieParams`)
+}
+
+func TestGenerateCode_TwoParamsUnpacksFields(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovie", "one",
+		`SELECT movies.id FROM movies WHERE movies.id = $1 AND movies.name = $2;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `arg\.Id`)
+	assert.MatchesRegexp(t, out, `arg\.Name`)
+}
+
+func TestGenerateCode_TwoParamsExecQuery(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "DeleteMovie", "exec",
+		`DELETE FROM movies WHERE movies.id = $1 AND movies.name = $2;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `DeleteMovieParams`)
+}
+
+func TestGenerateCode_OneParamNoParamsStruct(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovie", "one",
+		`SELECT movies.id FROM movies WHERE movies.id = $1;`, false)
+	assert.Nil(t, err)
+	assert.False(t, strings.Contains(out, "Params"))
+}
+
+func TestGenerateCode_ZeroParamsNoParamsStruct(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "ListMovies", "many",
+		`SELECT movies.id FROM movies;`, false)
+	assert.Nil(t, err)
+	assert.False(t, strings.Contains(out, "Params"))
 }
 
 // --- RETURNING type mismatch errors ---

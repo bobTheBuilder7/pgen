@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bobTheBuilder7/gen"
+	"github.com/bobTheBuilder7/pgen/utils"
 )
 
 func (c *cli) generateCode(_ context.Context, queries []resolvedQuery, output io.Writer, std bool) error {
@@ -39,9 +40,22 @@ func emitQuery(f *gen.File, rq resolvedQuery, std bool) {
 	funcParams := "ctx context.Context"
 	var callArgs []fmt.Stringer
 	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(rq.name+sqlConstSuffix))
-	for i, name := range rq.paramNames {
-		funcParams += ", " + name + " " + rq.paramTypes[i]
-		callArgs = append(callArgs, gen.Arg(name))
+
+	if len(rq.paramNames) >= 2 {
+		paramsStructName := rq.name + "Params"
+		var paramFields []gen.Field
+		for i, name := range rq.paramNames {
+			fieldName := utils.ToPascalCase(name)
+			paramFields = append(paramFields, gen.Field{Name: fieldName, Type: rq.paramTypes[i], Tag: `json:"` + name + `"`})
+			callArgs = append(callArgs, gen.Arg("arg."+fieldName))
+		}
+		f.AddBlock(gen.Struct(paramsStructName, paramFields...))
+		funcParams += ", arg " + paramsStructName
+	} else {
+		for i, name := range rq.paramNames {
+			funcParams += ", " + name + " " + rq.paramTypes[i]
+			callArgs = append(callArgs, gen.Arg(name))
+		}
 	}
 
 	rowStructName := rq.name + "Row"
