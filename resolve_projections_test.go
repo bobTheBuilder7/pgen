@@ -1141,6 +1141,44 @@ func TestPgTypeToGoType_DecimalAlias(t *testing.T) {
 	assert.Equal(t, pgTypeToGoType("decimal", true), "pgtype.Numeric")
 }
 
+func TestPgTypeToGoType_ByteaNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("bytea", false), "[]byte")
+}
+
+func TestPgTypeToGoType_ByteaNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("bytea", true), "pgtype.Bytea")
+}
+
+func TestResolveProjections_ByteaNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.checksum is bytea NOT NULL → []byte
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.checksum FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Checksum", Type: "[]byte", Tag: `json:"checksum"`}})
+	assert.Equal(t, scans, []string{"&i.Checksum"})
+}
+
+func TestResolveProjections_ByteaNullableColumn(t *testing.T) {
+	t.Parallel()
+	// movies.thumbnail is bytea NULL → pgtype.Bytea
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.thumbnail FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Thumbnail", Type: "pgtype.Bytea", Tag: `json:"thumbnail"`}})
+	assert.Equal(t, scans, []string{"&i.Thumbnail"})
+}
+
 func TestPgTypeToGoType_TextArrayNotNull(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, pgTypeToGoType("text[]", false), "[]string")

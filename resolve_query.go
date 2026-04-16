@@ -219,6 +219,11 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 			return "pgtype.JSONB"
 		}
 		return "[]byte"
+	case "bytea":
+		if nullable {
+			return "pgtype.Bytea"
+		}
+		return "[]byte"
 	case "numeric", "decimal":
 		return "pgtype.Numeric"
 	default:

@@ -1099,6 +1099,48 @@ func TestResolveParams_InsertJsonbAndNumeric(t *testing.T) {
 	assert.Equal(t, types, []string{"string", "pgtype.JSONB", "[]byte", "pgtype.Numeric", "pgtype.Numeric"})
 }
 
+func TestResolveParams_ByteaNotNullParam(t *testing.T) {
+	t.Parallel()
+	// movies.checksum is bytea NOT NULL → []byte
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.checksum = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"checksum"})
+	assert.Equal(t, types, []string{"[]byte"})
+}
+
+func TestResolveParams_ByteaNullableParam(t *testing.T) {
+	t.Parallel()
+	// movies.thumbnail is bytea NULL → pgtype.Bytea
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.thumbnail = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"thumbnail"})
+	assert.Equal(t, types, []string{"pgtype.Bytea"})
+}
+
+func TestResolveParams_InsertBytea(t *testing.T) {
+	t.Parallel()
+	// checksum is bytea NOT NULL → []byte, thumbnail is bytea NULL → pgtype.Bytea
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, checksum, thumbnail) VALUES ($1, $2, $3);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "checksum", "thumbnail"})
+	assert.Equal(t, types, []string{"string", "[]byte", "pgtype.Bytea"})
+}
+
 func TestResolveParams_InsertTextArrayParam(t *testing.T) {
 	t.Parallel()
 	// movies.tags is text[] NOT NULL → []string
