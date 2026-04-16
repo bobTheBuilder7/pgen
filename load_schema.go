@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 func (c *cli) loadSchemaFromDB(ctx context.Context) error {
 	rows, err := c.db.QueryContext(ctx, `
-		SELECT table_name, column_name, data_type, is_nullable, table_schema
+		SELECT table_name, column_name, data_type, udt_name, is_nullable, table_schema
 		FROM information_schema.columns
 		WHERE table_schema = 'pg_catalog'
 		ORDER BY table_name, ordinal_position
@@ -18,14 +19,19 @@ func (c *cli) loadSchemaFromDB(ctx context.Context) error {
 	defer rows.Close()
 
 	for rows.Next() {
-		var tableName, columnName, dataType, isNullable, tableSchema string
-		if err := rows.Scan(&tableName, &columnName, &dataType, &isNullable, &tableSchema); err != nil {
+		var tableName, columnName, dataType, udtName, isNullable, tableSchema string
+		if err := rows.Scan(&tableName, &columnName, &dataType, &udtName, &isNullable, &tableSchema); err != nil {
 			return err
+		}
+
+		colType := dataType
+		if strings.EqualFold(dataType, "ARRAY") {
+			colType = strings.TrimPrefix(udtName, "_") + "[]"
 		}
 
 		col := dbColumn{
 			Name:     columnName,
-			Type:     dataType,
+			Type:     colType,
 			Nullable: isNullable == "YES",
 		}
 		cols, _ := c.tablesCol.Load(tableName)

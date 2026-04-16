@@ -145,6 +145,14 @@ func convertNamedParams(sql string) (string, []string, error) {
 }
 
 func pgTypeToGoType(pgType string, nullable bool) string {
+	if strings.HasSuffix(pgType, "[]") {
+		elemGoType := pgTypeToGoType(pgType[:len(pgType)-2], false)
+		if nullable {
+			return "pgtype.Array[" + elemGoType + "]"
+		}
+		return "[]" + elemGoType
+	}
+
 	switch strings.ToLower(pgType) {
 	case "bigserial", "bigint", "int8":
 		if nullable {

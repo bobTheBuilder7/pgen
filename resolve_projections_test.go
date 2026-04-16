@@ -1140,3 +1140,117 @@ func TestPgTypeToGoType_DecimalAlias(t *testing.T) {
 	assert.Equal(t, pgTypeToGoType("decimal", false), "pgtype.Numeric")
 	assert.Equal(t, pgTypeToGoType("decimal", true), "pgtype.Numeric")
 }
+
+func TestPgTypeToGoType_TextArrayNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("text[]", false), "[]string")
+}
+
+func TestPgTypeToGoType_TextArrayNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("text[]", true), "pgtype.Array[string]")
+}
+
+func TestPgTypeToGoType_IntArrayNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("int4[]", false), "[]int32")
+}
+
+func TestPgTypeToGoType_IntArrayNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("int4[]", true), "pgtype.Array[int32]")
+}
+
+func TestPgTypeToGoType_BigintArrayNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("int8[]", false), "[]int64")
+}
+
+func TestPgTypeToGoType_BigintArrayNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("int8[]", true), "pgtype.Array[int64]")
+}
+
+func TestPgTypeToGoType_BoolArrayNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("bool[]", false), "[]bool")
+}
+
+func TestPgTypeToGoType_BoolArrayNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("bool[]", true), "pgtype.Array[bool]")
+}
+
+func TestResolveProjections_TextArrayNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.tags is text[] NOT NULL → []string
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.tags FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Tags", Type: "[]string", Tag: `json:"tags"`}})
+	assert.Equal(t, scans, []string{"&i.Tags"})
+}
+
+func TestResolveProjections_IntArrayNullableColumn(t *testing.T) {
+	t.Parallel()
+	// movies.scores is integer[] NULL → pgtype.Array[int32]
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.scores FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Scores", Type: "pgtype.Array[int32]", Tag: `json:"scores"`}})
+	assert.Equal(t, scans, []string{"&i.Scores"})
+}
+
+func TestResolveProjections_BoolArrayNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.flags is boolean[] NOT NULL → []bool
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.flags FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Flags", Type: "[]bool", Tag: `json:"flags"`}})
+	assert.Equal(t, scans, []string{"&i.Flags"})
+}
+
+func TestResolveProjections_BigintArrayNullableColumn(t *testing.T) {
+	t.Parallel()
+	// movies.related_ids is bigint[] NULL → pgtype.Array[int64]
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.related_ids FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "RelatedIds", Type: "pgtype.Array[int64]", Tag: `json:"related_ids"`}})
+	assert.Equal(t, scans, []string{"&i.RelatedIds"})
+}
+
+func TestResolveProjections_MixedArrayAndScalarColumns(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id, movies.name, movies.tags, movies.scores FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{
+		{Name: "Id", Type: "int64", Tag: `json:"id"`},
+		{Name: "Name", Type: "string", Tag: `json:"name"`},
+		{Name: "Tags", Type: "[]string", Tag: `json:"tags"`},
+		{Name: "Scores", Type: "pgtype.Array[int32]", Tag: `json:"scores"`},
+	})
+	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Tags", "&i.Scores"})
+}

@@ -1098,3 +1098,59 @@ func TestResolveParams_InsertJsonbAndNumeric(t *testing.T) {
 	assert.Equal(t, names, []string{"name", "metadata", "config", "rating", "price"})
 	assert.Equal(t, types, []string{"string", "pgtype.JSONB", "[]byte", "pgtype.Numeric", "pgtype.Numeric"})
 }
+
+func TestResolveParams_InsertTextArrayParam(t *testing.T) {
+	t.Parallel()
+	// movies.tags is text[] NOT NULL → []string
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, tags) VALUES ($1, $2);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "tags"})
+	assert.Equal(t, types, []string{"string", "[]string"})
+}
+
+func TestResolveParams_InsertNullableIntArrayParam(t *testing.T) {
+	t.Parallel()
+	// movies.scores is integer[] NULL → pgtype.Array[int32]
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, scores) VALUES ($1, $2);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "scores"})
+	assert.Equal(t, types, []string{"string", "pgtype.Array[int32]"})
+}
+
+func TestResolveParams_WhereTextArrayParam(t *testing.T) {
+	t.Parallel()
+	// movies.tags is text[] NOT NULL → []string
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.tags = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"tags"})
+	assert.Equal(t, types, []string{"[]string"})
+}
+
+func TestResolveParams_WhereNullableArrayParam(t *testing.T) {
+	t.Parallel()
+	// movies.scores is integer[] NULL → pgtype.Array[int32]
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.scores = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"scores"})
+	assert.Equal(t, types, []string{"pgtype.Array[int32]"})
+}
