@@ -209,6 +209,12 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 			return "pgtype.Timestamptz"
 		}
 		return "time.Time"
+	case "time", "time without time zone":
+		return "pgtype.Time"
+	case "timetz", "time with time zone":
+		return "pgtype.Time"
+	case "interval":
+		return "pgtype.Interval"
 	case "json":
 		if nullable {
 			return "pgtype.JSON"

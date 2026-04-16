@@ -1196,3 +1196,116 @@ func TestResolveParams_WhereNullableArrayParam(t *testing.T) {
 	assert.Equal(t, names, []string{"scores"})
 	assert.Equal(t, types, []string{"pgtype.Array[int32]"})
 }
+
+func TestResolveParams_VarcharNotNullParam(t *testing.T) {
+	t.Parallel()
+	// movies.slug is varchar(100) NOT NULL → string
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.slug = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"slug"})
+	assert.Equal(t, types, []string{"string"})
+}
+
+func TestResolveParams_VarcharNullableParam(t *testing.T) {
+	t.Parallel()
+	// movies.description is varchar(500) NULL → pgtype.Text
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.description = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"description"})
+	assert.Equal(t, types, []string{"pgtype.Text"})
+}
+
+func TestResolveParams_InsertVarchar(t *testing.T) {
+	t.Parallel()
+	// slug is varchar NOT NULL → string, description is varchar NULL → pgtype.Text
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, slug, description) VALUES ($1, $2, $3);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "slug", "description"})
+	assert.Equal(t, types, []string{"string", "string", "pgtype.Text"})
+}
+
+func TestResolveParams_TimeNotNullParam(t *testing.T) {
+	t.Parallel()
+	// movies.show_time is time NOT NULL → pgtype.Time
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.show_time = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"show_time"})
+	assert.Equal(t, types, []string{"pgtype.Time"})
+}
+
+func TestResolveParams_TimetzNullableParam(t *testing.T) {
+	t.Parallel()
+	// movies.show_timetz is timetz NULL → pgtype.Time
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.show_timetz = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"show_timetz"})
+	assert.Equal(t, types, []string{"pgtype.Time"})
+}
+
+func TestResolveParams_IntervalNotNullParam(t *testing.T) {
+	t.Parallel()
+	// movies.duration is interval NOT NULL → pgtype.Interval
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.duration = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"duration"})
+	assert.Equal(t, types, []string{"pgtype.Interval"})
+}
+
+func TestResolveParams_IntervalNullableParam(t *testing.T) {
+	t.Parallel()
+	// movies.break_time is interval NULL → pgtype.Interval
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.break_time = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"break_time"})
+	assert.Equal(t, types, []string{"pgtype.Interval"})
+}
+
+func TestResolveParams_InsertTimeInterval(t *testing.T) {
+	t.Parallel()
+	// show_time NOT NULL → pgtype.Time, show_timetz NULL → pgtype.Time
+	// duration NOT NULL → pgtype.Interval, break_time NULL → pgtype.Interval
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, show_time, show_timetz, duration, break_time) VALUES ($1, $2, $3, $4, $5);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "show_time", "show_timetz", "duration", "break_time"})
+	assert.Equal(t, types, []string{"string", "pgtype.Time", "pgtype.Time", "pgtype.Interval", "pgtype.Interval"})
+}

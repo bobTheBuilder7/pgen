@@ -1292,3 +1292,132 @@ func TestResolveProjections_MixedArrayAndScalarColumns(t *testing.T) {
 	})
 	assert.Equal(t, scans, []string{"&i.Id", "&i.Name", "&i.Tags", "&i.Scores"})
 }
+
+func TestPgTypeToGoType_VarcharNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("character varying", false), "string")
+}
+
+func TestPgTypeToGoType_VarcharNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("character varying", true), "pgtype.Text")
+}
+
+func TestResolveProjections_VarcharNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.slug is varchar(100) NOT NULL → string
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.slug FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Slug", Type: "string", Tag: `json:"slug"`}})
+	assert.Equal(t, scans, []string{"&i.Slug"})
+}
+
+func TestResolveProjections_VarcharNullableColumn(t *testing.T) {
+	t.Parallel()
+	// movies.description is varchar(500) NULL → pgtype.Text
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.description FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Description", Type: "pgtype.Text", Tag: `json:"description"`}})
+	assert.Equal(t, scans, []string{"&i.Description"})
+}
+
+func TestPgTypeToGoType_TimeNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("time", false), "pgtype.Time")
+}
+
+func TestPgTypeToGoType_TimeNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("time", true), "pgtype.Time")
+}
+
+func TestPgTypeToGoType_TimeLongForm(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("time without time zone", false), "pgtype.Time")
+}
+
+func TestPgTypeToGoType_TimetzNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("timetz", false), "pgtype.Time")
+}
+
+func TestPgTypeToGoType_TimetzLongForm(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("time with time zone", false), "pgtype.Time")
+}
+
+func TestPgTypeToGoType_IntervalNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("interval", false), "pgtype.Interval")
+}
+
+func TestPgTypeToGoType_IntervalNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, pgTypeToGoType("interval", true), "pgtype.Interval")
+}
+
+func TestResolveProjections_TimeNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.show_time is time NOT NULL → pgtype.Time
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.show_time FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "ShowTime", Type: "pgtype.Time", Tag: `json:"show_time"`}})
+	assert.Equal(t, scans, []string{"&i.ShowTime"})
+}
+
+func TestResolveProjections_TimetzNullableColumn(t *testing.T) {
+	t.Parallel()
+	// movies.show_timetz is timetz NULL → pgtype.Time
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.show_timetz FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "ShowTimetz", Type: "pgtype.Time", Tag: `json:"show_timetz"`}})
+	assert.Equal(t, scans, []string{"&i.ShowTimetz"})
+}
+
+func TestResolveProjections_IntervalNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.duration is interval NOT NULL → pgtype.Interval
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.duration FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Duration", Type: "pgtype.Interval", Tag: `json:"duration"`}})
+	assert.Equal(t, scans, []string{"&i.Duration"})
+}
+
+func TestResolveProjections_IntervalNullableColumn(t *testing.T) {
+	t.Parallel()
+	// movies.break_time is interval NULL → pgtype.Interval
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.break_time FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "BreakTime", Type: "pgtype.Interval", Tag: `json:"break_time"`}})
+	assert.Equal(t, scans, []string{"&i.BreakTime"})
+}
