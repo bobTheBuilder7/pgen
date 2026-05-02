@@ -35,11 +35,12 @@ func (c *cli) generateCode(_ context.Context, queries []resolvedQuery, output io
 // emitQuery writes Go code for a single resolved query into f.
 // It has no knowledge of SQL, schema, or type resolution.
 func emitQuery(f *gen.File, rq resolvedQuery, std bool) {
-	f.AddBlock(gen.Const(rq.name+sqlConstSuffix, gen.RawString(rq.sqlConst)))
+	sqlConstName := strings.ToLower(rq.name[:1]) + rq.name[1:] + sqlConstSuffix
+	f.AddBlock(gen.Const(sqlConstName, gen.RawString(rq.sqlConst)))
 
 	funcParams := "ctx context.Context"
 	var callArgs []fmt.Stringer
-	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(rq.name+sqlConstSuffix))
+	callArgs = append(callArgs, gen.Arg("ctx"), gen.Arg(sqlConstName))
 
 	if len(rq.paramNames) >= 2 {
 		paramsStructName := rq.name + "Params"

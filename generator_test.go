@@ -351,7 +351,7 @@ func TestGenerateCode_InsertReturningGeneratesSQLConst(t *testing.T) {
 	out, err := generateQueryOutput(t, testSharedCli, "CreateMovie", "one",
 		`INSERT INTO movies (name) VALUES ($1) RETURNING id;`, false)
 	assert.Nil(t, err)
-	assert.MatchesRegexp(t, out, `CreateMovieSQL`)
+	assert.MatchesRegexp(t, out, `createMovieSQL`)
 }
 
 func TestGenerateCode_InsertReturningGeneratesScanCall(t *testing.T) {
