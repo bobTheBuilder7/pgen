@@ -13,7 +13,7 @@ func (c *cli) runMigration(ctx context.Context, name string, r io.Reader) error 
 		return errors.Join(err, errors.New("reading migration failed"))
 	}
 
-	_, err = c.db.ExecContext(ctx, string(migration))
+	_, err = c.db.Exec(ctx, string(migration))
 	if err != nil {
 		return fmt.Errorf("migration %s: %w", name, err)
 	}

@@ -7,10 +7,10 @@ import (
 )
 
 func (c *cli) loadSchemaFromDB(ctx context.Context) error {
-	rows, err := c.db.QueryContext(ctx, `
+	rows, err := c.db.Query(ctx, `
 		SELECT table_name, column_name, data_type, udt_name, is_nullable, table_schema
 		FROM information_schema.columns
-		WHERE table_schema = 'pg_catalog'
+		WHERE table_schema = 'public'
 		ORDER BY table_name, ordinal_position
 	`)
 	if err != nil {

@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	_ "github.com/bobTheBuilder7/gopglite"
 	"github.com/bobTheBuilder7/pgen/syncmap"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 type dbColumn struct {
@@ -20,26 +23,49 @@ type dbColumn struct {
 }
 
 type cli struct {
-	tablesCol          syncmap.Map[string, []dbColumn]
-	db                 *sql.DB
-	dbDirectory        string
-	queriesDirectory   string
+	tablesCol           syncmap.Map[string, []dbColumn]
+	db                  *pgxpool.Pool
+	dbDirectory         string
+	queriesDirectory    string
 	migrationsDirectory string
 }
 
 func run(ctx context.Context, std bool, debug bool, dbDirectory string, queriesDirectory string, migrationsDirectory string) error {
-	db, err := sql.Open("pglite", ":memory:")
+	postgresC, err := testcontainers.Run(
+		ctx, "postgres:18",
+		testcontainers.WithLogger(log.New(io.Discard, "", 0)),
+		testcontainers.WithEnv(map[string]string{
+			"POSTGRES_PASSWORD": "password",
+		}),
+		testcontainers.WithExposedPorts("5432/tcp"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+			wait.ForListeningPort("5432/tcp"),
+		),
+	)
 	if err != nil {
-		return errors.Join(err, errors.New("pglite db failed"))
+		return fmt.Errorf("starting postgres container: %w", err)
 	}
-	defer db.Close()
+	defer postgresC.Terminate(ctx)
 
-	db.SetMaxOpenConns(1)
-	db.SetConnMaxIdleTime(0)
-	db.SetConnMaxLifetime(0)
+	endpoint, err := postgresC.PortEndpoint(ctx, "5432/tcp", "")
+	if err != nil {
+		return fmt.Errorf("getting postgres endpoint: %w", err)
+	}
+
+	connPool, err := pgxpool.New(ctx, fmt.Sprintf("postgres://postgres:password@%s/postgres", endpoint))
+	if err != nil {
+		return fmt.Errorf("creating connection pool: %w", err)
+	}
+	defer connPool.Close()
+
+	err = connPool.Ping(ctx)
+	if err != nil {
+		return fmt.Errorf("pinging postgres: %w", err)
+	}
 
 	c := &cli{
-		db:                  db,
+		db:                  connPool,
 		dbDirectory:         dbDirectory,
 		queriesDirectory:    queriesDirectory,
 		migrationsDirectory: migrationsDirectory,

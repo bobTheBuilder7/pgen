@@ -18,7 +18,7 @@ func TestRunMigration_CreateTable(t *testing.T) {
 
 	// verify table exists
 	var count int
-	err = c.db.QueryRowContext(t.Context(),
+	err = c.db.QueryRow(t.Context(),
 		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'organizations'`,
 	).Scan(&count)
 	assert.Nil(t, err)
@@ -51,7 +51,7 @@ func runMigrations(t *testing.T, c *cli, migrations [][2]string) error {
 
 func tableColumns(t *testing.T, c *cli, table string) []string {
 	t.Helper()
-	rows, err := c.db.QueryContext(t.Context(),
+	rows, err := c.db.Query(t.Context(),
 		`SELECT column_name FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position`,
 		table,
 	)
@@ -82,7 +82,7 @@ func TestMultipleMigrations_TablesCreatedInOrder(t *testing.T) {
 	assert.Nil(t, err)
 
 	var count int
-	err = c.db.QueryRowContext(t.Context(),
+	err = c.db.QueryRow(t.Context(),
 		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('products', 'categories', 'orders')`,
 	).Scan(&count)
 	assert.Nil(t, err)
@@ -126,7 +126,7 @@ func TestMultipleMigrations_FailedMigrationStopsChain(t *testing.T) {
 
 	// 003 should not have been applied
 	var count int
-	_ = c.db.QueryRowContext(t.Context(),
+	_ = c.db.QueryRow(t.Context(),
 		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'comments'`,
 	).Scan(&count)
 	assert.Equal(t, count, 0)
@@ -141,7 +141,7 @@ func TestRunMigration_MultipleStatements(t *testing.T) {
 	assert.Nil(t, err)
 
 	var count int
-	err = c.db.QueryRowContext(t.Context(),
+	err = c.db.QueryRow(t.Context(),
 		`SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('employees', 'ads')`,
 	).Scan(&count)
 	assert.Nil(t, err)
