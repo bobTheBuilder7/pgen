@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/bobTheBuilder7/assert v1.0.0
-	github.com/bobTheBuilder7/gen v0.0.7
+	github.com/bobTheBuilder7/gen v0.0.8
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/valkdb/postgresparser v1.1.9

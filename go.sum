@@ -12,6 +12,8 @@ github.com/bobTheBuilder7/assert v1.0.0 h1:ED55Gq7fLGeB/Xpg17ilV8IQ1Ivhi2VeRY3jG
 github.com/bobTheBuilder7/assert v1.0.0/go.mod h1:doXACb4VYWYeEcvyHgVCyLbhTOb6bVO0esDYMOWn/r0=
 github.com/bobTheBuilder7/gen v0.0.7 h1:A8i0nPXTntHY0rJPhaqHH5vAwEDvQX7rAD77kK/Wj04=
 github.com/bobTheBuilder7/gen v0.0.7/go.mod h1:nnY38IaiCg1SQnIrvO8RWc3bYbgbrtvp09IhZA48aBY=
+github.com/bobTheBuilder7/gen v0.0.8 h1:FVA6UZDKpmevpWTop11DNsfYNnEGtlYJ01Tct9OuoOw=
+github.com/bobTheBuilder7/gen v0.0.8/go.mod h1:nnY38IaiCg1SQnIrvO8RWc3bYbgbrtvp09IhZA48aBY=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
