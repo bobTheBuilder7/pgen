@@ -1421,3 +1421,30 @@ func TestResolveProjections_IntervalNullableColumn(t *testing.T) {
 	assert.Equal(t, fields, []gen.Field{{Name: "BreakTime", Type: "pgtype.Interval", Tag: `json:"break_time"`}})
 	assert.Equal(t, scans, []string{"&i.BreakTime"})
 }
+
+// --- EXISTS ---
+
+func TestResolveProjections_SelectExistsReturnsBool(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT EXISTS(SELECT 1 FROM trailers WHERE trailers.movie_id = $1) AS exists_trailers;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "ExistsTrailers", Type: "bool", Tag: `json:"exists_trailers"`}})
+	assert.Equal(t, scans, []string{"&i.ExistsTrailers"})
+}
+
+func TestResolveProjections_SelectExistsRequiresAlias(t *testing.T) {
+	t.Parallel()
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT EXISTS(SELECT 1 FROM trailers WHERE trailers.movie_id = $1);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}

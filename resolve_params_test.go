@@ -1309,3 +1309,19 @@ func TestResolveParams_InsertTimeInterval(t *testing.T) {
 	assert.Equal(t, names, []string{"name", "show_time", "show_timetz", "duration", "break_time"})
 	assert.Equal(t, types, []string{"string", "pgtype.Time", "pgtype.Time", "pgtype.Interval", "pgtype.Interval"})
 }
+
+// --- EXISTS subquery params ---
+
+func TestResolveParams_ExistsSubqueryParam(t *testing.T) {
+	t.Parallel()
+	// $1 is inside the EXISTS subquery — resolved via buildSubqueryParamMap
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT EXISTS(SELECT 1 FROM trailers WHERE trailers.movie_id = $1) AS exists_trailers;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"movie_id"})
+	assert.Equal(t, types, []string{"pgtype.Int8"})
+}

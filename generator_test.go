@@ -446,3 +446,21 @@ func TestGenerateCode_InsertWithoutReturningWithManyTypeReturnsError(t *testing.
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `many`)
 }
+
+// --- EXISTS ---
+
+func TestGenerateCode_SelectExistsGeneratesBoolField(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "TrailerExists", "one",
+		`SELECT EXISTS(SELECT 1 FROM trailers WHERE trailers.movie_id = $1) AS exists_trailers;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `ExistsTrailers\s+bool`)
+}
+
+func TestGenerateCode_SelectExistsWithoutAliasReturnsError(t *testing.T) {
+	t.Parallel()
+	err := generateQuery(t, testSharedCli, "TrailerExists", "one",
+		`SELECT EXISTS(SELECT 1 FROM trailers WHERE trailers.movie_id = $1);`, false)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}

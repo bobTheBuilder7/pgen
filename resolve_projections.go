@@ -135,7 +135,8 @@ func cteOutputColName(col postgresparser.SelectColumn) string {
 
 // resolveAggregationType resolves the PG type and nullability for an aggregation
 // function expression. Supports COUNT (always int64, never null), SUM (column
-// type, always nullable), and COALESCE (inner type, forced non-nullable).
+// type, always nullable), COALESCE (inner type, forced non-nullable), and
+// EXISTS (always bool, never null).
 func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableRef, ctes []postgresparser.CTE) (pgType string, nullable bool, err error) {
 	m := aggregationRegex.FindStringSubmatch(expr)
 	if m == nil {
@@ -172,8 +173,10 @@ func (c *cli) resolveAggregationType(expr string, tables []postgresparser.TableR
 			return "", false, fmt.Errorf("COALESCE: %w", err)
 		}
 		return pgType, false, nil
+	case "EXISTS":
+		return "bool", false, nil
 	default:
-		return "", false, fmt.Errorf("unsupported aggregation function %q: only COUNT, SUM, AVG, MIN, MAX, and COALESCE are supported", fn)
+		return "", false, fmt.Errorf("unsupported aggregation function %q: only COUNT, SUM, AVG, MIN, MAX, COALESCE, and EXISTS are supported", fn)
 	}
 }
 
