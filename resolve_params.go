@@ -112,7 +112,11 @@ func (c *cli) resolveParams(parsedSQL *postgresparser.ParsedQuery) ([]string, []
 	var usages []postgresparser.ColumnUsage
 	switch parsedSQL.Command {
 	case postgresparser.QueryCommandUpdate:
-		usages = append(usages, filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeDMLSet)...)
+		for _, cu := range filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeDMLSet) {
+			if strings.Contains(cu.Context, "$") {
+				usages = append(usages, cu)
+			}
+		}
 		for _, cu := range filterColumns(parsedSQL.ColumnUsage, postgresparser.ColumnUsageTypeFilter) {
 			if !isPhantomSubqueryFilter(cu) {
 				usages = append(usages, cu)

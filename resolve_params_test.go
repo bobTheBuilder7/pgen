@@ -204,6 +204,34 @@ func TestResolveParams_UpdateMultipleWhereColumns(t *testing.T) {
 	assert.Equal(t, types, []string{"string", "int64", "pgtype.Int4"})
 }
 
+func TestResolveParams_UpdateSetLiteralWhereParam(t *testing.T) {
+	t.Parallel()
+	// SET uses a literal (false), not a parameter — only WHERE has $1
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE movies SET active = false WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"id"})
+	assert.Equal(t, types, []string{"int64"})
+}
+
+func TestResolveParams_UpdateMixedLiteralAndParamInSet(t *testing.T) {
+	t.Parallel()
+	// SET has one literal (active = false) and one param (name = $1), WHERE has $2
+	parsedSQL, err := postgresparser.ParseSQLStrict(`UPDATE movies SET active = false, name = $1 WHERE movies.id = $2;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"name", "id"})
+	assert.Equal(t, types, []string{"string", "int64"})
+}
+
 func TestResolveParams_InsertSimple(t *testing.T) {
 	t.Parallel()
 	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO movies (name, box_office, when_released) VALUES ($1, $2, $3);`)
