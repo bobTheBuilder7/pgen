@@ -24,6 +24,7 @@ type dbColumn struct {
 
 type cli struct {
 	tablesCol           syncmap.Map[string, []dbColumn]
+	enums               syncmap.Map[string, []string]
 	db                  *pgxpool.Pool
 	dbDirectory         string
 	queriesDirectory    string
@@ -99,6 +100,10 @@ func run(ctx context.Context, std bool, debug bool, dbDirectory string, queriesD
 		return err
 	}
 
+	if err := c.loadEnumsFromDB(ctx); err != nil {
+		return err
+	}
+
 	queryFiles, err := os.ReadDir(filepath.Join(c.dbDirectory, c.queriesDirectory))
 	if err != nil {
 		return err
@@ -171,6 +176,22 @@ func run(ctx context.Context, std bool, debug bool, dbDirectory string, queriesD
 	err = generateBaseFile(baseFile, std)
 	if err != nil {
 		return errors.Join(err, errors.New("generateBaseFile failed"))
+	}
+
+	var modelsFile *os.File
+	if debug {
+		modelsFile = os.Stdout
+	} else {
+		modelsFile, err = os.Create(filepath.Join(c.dbDirectory, "models.go"))
+		if err != nil {
+			return err
+		}
+		defer modelsFile.Close()
+	}
+
+	err = generateModelsFile(modelsFile, &c.enums)
+	if err != nil {
+		return errors.Join(err, errors.New("generateModelsFile failed"))
 	}
 
 	return nil

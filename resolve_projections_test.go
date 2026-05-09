@@ -1043,14 +1043,14 @@ JOIN movies ON movies.id = recent_trailers.movie_id;`)
 
 func TestPgTypeToGoType_TimestampNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("timestamp", false), "time.Time")
-	assert.Equal(t, pgTypeToGoType("timestamp without time zone", false), "time.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("timestamp", false), "time.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("timestamp without time zone", false), "time.Time")
 }
 
 func TestPgTypeToGoType_TimestampNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("timestamp", true), "pgtype.Timestamp")
-	assert.Equal(t, pgTypeToGoType("timestamp without time zone", true), "pgtype.Timestamp")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("timestamp", true), "pgtype.Timestamp")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("timestamp without time zone", true), "pgtype.Timestamp")
 }
 
 func TestResolveProjections_JsonbNullableColumn(t *testing.T) {
@@ -1107,48 +1107,48 @@ func TestResolveProjections_NumericNotNullColumn(t *testing.T) {
 
 func TestPgTypeToGoType_JsonbNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("jsonb", false), "[]byte")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("jsonb", false), "[]byte")
 }
 
 func TestPgTypeToGoType_JsonbNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("jsonb", true), "pgtype.JSONB")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("jsonb", true), "pgtype.JSONB")
 }
 
 func TestPgTypeToGoType_JsonNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("json", false), "[]byte")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("json", false), "[]byte")
 }
 
 func TestPgTypeToGoType_JsonNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("json", true), "pgtype.JSON")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("json", true), "pgtype.JSON")
 }
 
 func TestPgTypeToGoType_NumericNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("numeric", false), "pgtype.Numeric")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("numeric", false), "pgtype.Numeric")
 }
 
 func TestPgTypeToGoType_NumericNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("numeric", true), "pgtype.Numeric")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("numeric", true), "pgtype.Numeric")
 }
 
 func TestPgTypeToGoType_DecimalAlias(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("decimal", false), "pgtype.Numeric")
-	assert.Equal(t, pgTypeToGoType("decimal", true), "pgtype.Numeric")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("decimal", false), "pgtype.Numeric")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("decimal", true), "pgtype.Numeric")
 }
 
 func TestPgTypeToGoType_ByteaNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("bytea", false), "[]byte")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("bytea", false), "[]byte")
 }
 
 func TestPgTypeToGoType_ByteaNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("bytea", true), "pgtype.Bytea")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("bytea", true), "pgtype.Bytea")
 }
 
 func TestResolveProjections_ByteaNotNullColumn(t *testing.T) {
@@ -1181,42 +1181,42 @@ func TestResolveProjections_ByteaNullableColumn(t *testing.T) {
 
 func TestPgTypeToGoType_TextArrayNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("text[]", false), "[]string")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("text[]", false), "[]string")
 }
 
 func TestPgTypeToGoType_TextArrayNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("text[]", true), "pgtype.Array[string]")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("text[]", true), "pgtype.Array[string]")
 }
 
 func TestPgTypeToGoType_IntArrayNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("int4[]", false), "[]int32")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("int4[]", false), "[]int32")
 }
 
 func TestPgTypeToGoType_IntArrayNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("int4[]", true), "pgtype.Array[int32]")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("int4[]", true), "pgtype.Array[int32]")
 }
 
 func TestPgTypeToGoType_BigintArrayNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("int8[]", false), "[]int64")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("int8[]", false), "[]int64")
 }
 
 func TestPgTypeToGoType_BigintArrayNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("int8[]", true), "pgtype.Array[int64]")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("int8[]", true), "pgtype.Array[int64]")
 }
 
 func TestPgTypeToGoType_BoolArrayNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("bool[]", false), "[]bool")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("bool[]", false), "[]bool")
 }
 
 func TestPgTypeToGoType_BoolArrayNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("bool[]", true), "pgtype.Array[bool]")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("bool[]", true), "pgtype.Array[bool]")
 }
 
 func TestResolveProjections_TextArrayNotNullColumn(t *testing.T) {
@@ -1295,12 +1295,12 @@ func TestResolveProjections_MixedArrayAndScalarColumns(t *testing.T) {
 
 func TestPgTypeToGoType_VarcharNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("character varying", false), "string")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("character varying", false), "string")
 }
 
 func TestPgTypeToGoType_VarcharNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("character varying", true), "pgtype.Text")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("character varying", true), "pgtype.Text")
 }
 
 func TestResolveProjections_VarcharNotNullColumn(t *testing.T) {
@@ -1333,37 +1333,37 @@ func TestResolveProjections_VarcharNullableColumn(t *testing.T) {
 
 func TestPgTypeToGoType_TimeNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("time", false), "pgtype.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("time", false), "pgtype.Time")
 }
 
 func TestPgTypeToGoType_TimeNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("time", true), "pgtype.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("time", true), "pgtype.Time")
 }
 
 func TestPgTypeToGoType_TimeLongForm(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("time without time zone", false), "pgtype.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("time without time zone", false), "pgtype.Time")
 }
 
 func TestPgTypeToGoType_TimetzNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("timetz", false), "pgtype.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("timetz", false), "pgtype.Time")
 }
 
 func TestPgTypeToGoType_TimetzLongForm(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("time with time zone", false), "pgtype.Time")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("time with time zone", false), "pgtype.Time")
 }
 
 func TestPgTypeToGoType_IntervalNotNull(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("interval", false), "pgtype.Interval")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("interval", false), "pgtype.Interval")
 }
 
 func TestPgTypeToGoType_IntervalNullable(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, pgTypeToGoType("interval", true), "pgtype.Interval")
+	assert.Equal(t, testSharedCli.pgTypeToGoType("interval", true), "pgtype.Interval")
 }
 
 func TestResolveProjections_TimeNotNullColumn(t *testing.T) {
@@ -1447,4 +1447,65 @@ func TestResolveProjections_SelectExistsRequiresAlias(t *testing.T) {
 	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+// --- Duplicate column detection ---
+
+func TestResolveProjections_DuplicateColumnNameReturnsError(t *testing.T) {
+	t.Parallel()
+	// movies.name and trailers joined but both have .name — no alias
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.name, trailers.url, movies.name FROM movies JOIN trailers ON trailers.movie_id = movies.id WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	_, _, err = testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.NotNil(t, err)
+	assert.MatchesRegexp(t, err.Error(), `duplicate`)
+	assert.MatchesRegexp(t, err.Error(), `alias`)
+}
+
+// --- Enum types ---
+
+func TestPgTypeToGoType_EnumNotNull(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, testSharedCli.pgTypeToGoType("movie_status", false), "MovieStatus")
+}
+
+func TestPgTypeToGoType_EnumNullable(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, testSharedCli.pgTypeToGoType("trailer_type", true), "NullTrailerType")
+}
+
+func TestPgTypeToGoType_UnknownTypeFallsBackToString(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, testSharedCli.pgTypeToGoType("nonexistent_pg_type", false), "string")
+}
+
+func TestResolveProjections_EnumNotNullColumn(t *testing.T) {
+	t.Parallel()
+	// movies.status is movie_status NOT NULL → MovieStatus
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.status FROM movies WHERE movies.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "Status", Type: "MovieStatus", Tag: `json:"status"`}})
+	assert.Equal(t, scans, []string{"&i.Status"})
+}
+
+func TestResolveProjections_EnumNullableColumn(t *testing.T) {
+	t.Parallel()
+	// trailers.trailer_type is trailer_type NULL → NullTrailerType
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT trailers.trailer_type FROM trailers WHERE trailers.id = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	fields, scans, err := testSharedCli.resolveProjections(parsedSQL.Columns, parsedSQL.Tables, parsedSQL.CTEs)
+	assert.Nil(t, err)
+	assert.Equal(t, fields, []gen.Field{{Name: "TrailerType", Type: "NullTrailerType", Tag: `json:"trailer_type"`}})
+	assert.Equal(t, scans, []string{"&i.TrailerType"})
 }

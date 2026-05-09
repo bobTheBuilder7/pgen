@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bobTheBuilder7/gen"
+	"github.com/bobTheBuilder7/pgen/utils"
 	"github.com/valkdb/postgresparser"
 )
 
@@ -144,9 +145,9 @@ func convertNamedParams(sql string) (string, []string, error) {
 	return converted, paramNames, nil
 }
 
-func pgTypeToGoType(pgType string, nullable bool) string {
+func (c *cli) pgTypeToGoType(pgType string, nullable bool) string {
 	if strings.HasSuffix(pgType, "[]") {
-		elemGoType := pgTypeToGoType(pgType[:len(pgType)-2], false)
+		elemGoType := c.pgTypeToGoType(pgType[:len(pgType)-2], false)
 		if nullable {
 			return "pgtype.Array[" + elemGoType + "]"
 		}
@@ -233,6 +234,13 @@ func pgTypeToGoType(pgType string, nullable bool) string {
 	case "numeric", "decimal":
 		return "pgtype.Numeric"
 	default:
+		if _, ok := c.enums.Load(pgType); ok {
+			goName := utils.ToPascalCase(pgType)
+			if nullable {
+				return "Null" + goName
+			}
+			return goName
+		}
 		return "string"
 	}
 }

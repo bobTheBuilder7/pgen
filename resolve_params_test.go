@@ -1353,3 +1353,47 @@ func TestResolveParams_ExistsSubqueryParam(t *testing.T) {
 	assert.Equal(t, names, []string{"movie_id"})
 	assert.Equal(t, types, []string{"pgtype.Int8"})
 }
+
+// --- Enum params ---
+
+func TestResolveParams_EnumNotNullWhereParam(t *testing.T) {
+	t.Parallel()
+	// movies.status is movie_status NOT NULL → MovieStatus
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT movies.id FROM movies WHERE movies.status = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"status"})
+	assert.Equal(t, types, []string{"MovieStatus"})
+}
+
+func TestResolveParams_EnumNullableWhereParam(t *testing.T) {
+	t.Parallel()
+	// trailers.trailer_type is trailer_type NULL → NullTrailerType
+	parsedSQL, err := postgresparser.ParseSQLStrict(`SELECT trailers.id FROM trailers WHERE trailers.trailer_type = $1;`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"trailer_type"})
+	assert.Equal(t, types, []string{"NullTrailerType"})
+}
+
+func TestResolveParams_InsertEnumParams(t *testing.T) {
+	t.Parallel()
+	// INSERT into trailers with enum column
+	parsedSQL, err := postgresparser.ParseSQLStrict(`INSERT INTO trailers (movie_id, url, trailer_type) VALUES ($1, $2, $3);`)
+	if err != nil {
+		t.Fatalf("failed to parse query: %v", err)
+	}
+
+	names, types, err := testSharedCli.resolveParams(parsedSQL)
+	assert.Nil(t, err)
+	assert.Equal(t, names, []string{"movie_id", "url", "trailer_type"})
+	assert.Equal(t, types, []string{"pgtype.Int8", "string", "NullTrailerType"})
+}

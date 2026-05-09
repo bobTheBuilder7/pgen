@@ -237,7 +237,7 @@ func (c *cli) resolveParamFromUsage(usage postgresparser.ColumnUsage, tables []p
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
 			nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, tables)
-			goType = pgTypeToGoType(ddlCol.Type, nullable)
+			goType = c.pgTypeToGoType(ddlCol.Type, nullable)
 			break
 		}
 	}
@@ -274,7 +274,7 @@ func (c *cli) resolveInsertParams(parsedSQL *postgresparser.ParsedQuery) ([]stri
 		var goType string
 		for _, ddlCol := range ddlColumns {
 			if ddlCol.Name == colName {
-				goType = pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
+				goType = c.pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
 				break
 			}
 		}

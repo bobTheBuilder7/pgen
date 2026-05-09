@@ -464,3 +464,30 @@ func TestGenerateCode_SelectExistsWithoutAliasReturnsError(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.MatchesRegexp(t, err.Error(), `alias`)
 }
+
+// --- Enum types ---
+
+func TestGenerateCode_EnumNotNullFieldInRow(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovieStatus", "one",
+		`SELECT movies.status FROM movies WHERE movies.id = $1;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `Status\s+MovieStatus`)
+}
+
+func TestGenerateCode_EnumNullableFieldInRow(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetTrailerType", "one",
+		`SELECT trailers.trailer_type FROM trailers WHERE trailers.id = $1;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `TrailerType\s+NullTrailerType`)
+}
+
+func TestGenerateCode_EnumParamInParamsStruct(t *testing.T) {
+	t.Parallel()
+	out, err := generateQueryOutput(t, testSharedCli, "GetMovieByStatusAndId", "one",
+		`SELECT movies.name FROM movies WHERE movies.id = $1 AND movies.status = $2;`, false)
+	assert.Nil(t, err)
+	assert.MatchesRegexp(t, out, `GetMovieByStatusAndIdParams`)
+	assert.MatchesRegexp(t, out, `Status\s+MovieStatus`)
+}

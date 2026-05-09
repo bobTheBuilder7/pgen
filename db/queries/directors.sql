@@ -14,7 +14,7 @@ UPDATE directors SET name = $1, description = $2, dob = $3, city_born = $4 WHERE
 DELETE FROM directors WHERE directors.id = $1;
 
 -- name: GetDirectorWithLocation :one
-SELECT directors.id, directors.name, directors.description, directors.dob, cities.name, states.name, countries.name
+SELECT directors.id, directors.name, directors.description, directors.dob, cities.name AS city_name, states.name AS state_name, countries.name AS country_name
 FROM directors
 JOIN cities ON cities.id = directors.city_born
 LEFT JOIN states ON states.id = cities.state_id
@@ -22,14 +22,14 @@ JOIN countries ON countries.id = cities.country_id
 WHERE directors.id = $1;
 
 -- name: ListDirectorsWithLocation :many
-SELECT directors.id, directors.name, directors.dob, cities.name, states.name, countries.name
+SELECT directors.id, directors.name, directors.dob, cities.name AS city_name, states.name AS state_name, countries.name AS country_name
 FROM directors
 JOIN cities ON cities.id = directors.city_born
 LEFT JOIN states ON states.id = cities.state_id
 JOIN countries ON countries.id = cities.country_id;
 
 -- name: ListDirectorsByCountry :many
-SELECT directors.id, directors.name, directors.dob, cities.name, countries.name
+SELECT directors.id, directors.name, directors.dob, cities.name AS city_name, countries.name AS country_name
 FROM directors
 JOIN cities ON cities.id = directors.city_born
 JOIN countries ON countries.id = cities.country_id
@@ -71,7 +71,7 @@ JOIN movies ON movies.id = movie_directors.movie_id
 WHERE movies.box_office > $1;
 
 -- name: ListDirectorsBornInCountryWithMoviesAfter :many
-SELECT directors.id, directors.name, directors.dob, countries.name
+SELECT directors.id, directors.name, directors.dob, countries.name AS country_name
 FROM directors
 JOIN cities ON cities.id = directors.city_born
 JOIN countries ON countries.id = cities.country_id
@@ -94,7 +94,7 @@ WITH city_directors AS (
     FROM directors
     WHERE directors.city_born = $1
 )
-SELECT city_directors.id, city_directors.name, city_directors.dob, cities.name, countries.name
+SELECT city_directors.id, city_directors.name, city_directors.dob, cities.name AS city_name, countries.name AS country_name
 FROM city_directors
 JOIN cities ON cities.id = city_directors.city_born
 JOIN countries ON countries.id = cities.country_id;
@@ -124,7 +124,7 @@ WITH earliest_releases AS (
         LIMIT 1
     )
 )
-SELECT directors.id, directors.name, earliest_releases.name, earliest_releases.when_released
+SELECT directors.id, directors.name, earliest_releases.name AS movie_name, earliest_releases.when_released
 FROM directors
 JOIN earliest_releases ON earliest_releases.director_id = directors.id;
 

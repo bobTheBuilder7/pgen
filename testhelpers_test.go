@@ -97,6 +97,11 @@ func testMain(m *testing.M) int {
 		return 1
 	}
 
+	if err := testSharedCli.loadEnumsFromDB(ctx); err != nil {
+		fmt.Printf("failed to load enums: %v\n", err)
+		return 1
+	}
+
 	return m.Run()
 }
 

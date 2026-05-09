@@ -18,6 +18,7 @@ var aggregationRegex = regexp.MustCompile(`(?i)^(\w+)\((.+)\)$`)
 func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables []postgresparser.TableRef, ctes []postgresparser.CTE) ([]gen.Field, []string, error) {
 	var structFields []gen.Field
 	var scanFields []string
+	seen := make(map[string]bool)
 
 	for _, col := range columns {
 		expr := strings.TrimSpace(col.Expression)
@@ -43,6 +44,11 @@ func (c *cli) resolveProjections(columns []postgresparser.SelectColumn, tables [
 		}
 		fieldName := utils.ToPascalCase(jsonName)
 
+		if seen[fieldName] {
+			return nil, nil, fmt.Errorf("duplicate column name %q in SELECT: use an alias to disambiguate (e.g. %s AS some_alias)", jsonName, expr)
+		}
+		seen[fieldName] = true
+
 		structFields = append(structFields, gen.Field{Name: fieldName, Type: goType, Tag: `json:"` + jsonName + `"`})
 		scanFields = append(scanFields, "&i."+fieldName)
 	}
@@ -62,7 +68,7 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 		if err != nil {
 			return "", err
 		}
-		return pgTypeToGoType(pgType, nullable), nil
+		return c.pgTypeToGoType(pgType, nullable), nil
 	}
 
 	// String literal or scalar subquery — type is string
@@ -113,7 +119,7 @@ func (c *cli) resolveColumnGoType(col postgresparser.SelectColumn, tables []post
 	for _, ddlCol := range ddlColumns {
 		if ddlCol.Name == colName {
 			nullable := ddlCol.Nullable || isOuterJoinNullable(tableName, tables)
-			return pgTypeToGoType(ddlCol.Type, nullable), nil
+			return c.pgTypeToGoType(ddlCol.Type, nullable), nil
 		}
 	}
 
@@ -310,7 +316,7 @@ func (c *cli) resolveReturning(parsedSQL *postgresparser.ParsedQuery) ([]gen.Fie
 		var goType string
 		for _, ddlCol := range ddlColumns {
 			if ddlCol.Name == col.Column {
-				goType = pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
+				goType = c.pgTypeToGoType(ddlCol.Type, ddlCol.Nullable)
 				break
 			}
 		}
